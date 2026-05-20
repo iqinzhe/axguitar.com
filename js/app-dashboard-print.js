@@ -19,6 +19,13 @@
         tbody tr { break-inside: avoid; page-break-inside: avoid; }
         th { background: #f1f5f9; font-weight: 600; text-align: left; }
         th, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }
+        /* 客户列表列宽：ID窄，地址宽 */
+        .customer-list-table col.col-id         { width: 18mm; }
+        .customer-list-table col.col-name        { width: 28mm; }
+        .customer-list-table col.col-phone       { width: 24mm; }
+        .customer-list-table col.col-ktp         { width: 28mm; }
+        .customer-list-table col.col-occupation  { width: 20mm; }
+        .customer-list-table col.col-address     { width: 48mm; }
         .amount { text-align: right; }
         .text-center { text-align: center; }
         .card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; break-inside: auto !important; page-break-inside: auto !important; }
@@ -152,25 +159,30 @@ ${buildFooter(lang)}
             });
         },
 
-        // 客户列表：隐藏「创建订单」列，「操作」列改为「地址」
+        // 客户列表：隐藏「创建订单」列，「操作」列改为「地址」，注入 colgroup 控制列宽
         _fixCustomerListForPrint(printContent) {
             const tables = printContent.querySelectorAll('.customer-list-table');
             if (!tables.length) return;
             const lang = Utils.lang;
             tables.forEach(table => {
+                // 注入 colgroup 精确控制列宽（地址列最宽）
+                if (!table.querySelector('colgroup')) {
+                    const cg = document.createElement('colgroup');
+                    cg.innerHTML = '<col style="width:16mm"><col style="width:26mm"><col style="width:22mm"><col style="width:26mm"><col style="width:18mm"><col style="width:46mm">';
+                    table.prepend(cg);
+                }
                 const thead = table.querySelector('thead tr');
                 if (!thead) return;
                 const ths = Array.from(thead.querySelectorAll('th'));
                 const n = ths.length;
                 if (n < 2) return;
-                // 最后两列：倒数第2=创建订单，倒数第1=操作
+                // 倒数第2=创建订单(隐藏)，倒数第1=操作(改为地址)
                 ths[n-2].style.display = 'none';
                 ths[n-1].textContent = lang==='id' ? 'Alamat' : '地址';
                 table.querySelectorAll('tbody tr').forEach(tr => {
                     const tds = Array.from(tr.querySelectorAll('td'));
                     if (tds.length < n) return;
                     tds[n-2].style.display = 'none';
-                    // 操作列清空按钮，显示地址（data-address属性）
                     tds[n-1].innerHTML = Utils.escapeHtml(tds[n-1].getAttribute('data-address') || '-');
                     tds[n-1].style.textAlign = 'left';
                 });

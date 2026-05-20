@@ -72,8 +72,8 @@
                         rows += `<tr class="data-row">
                             <td class="col-id">${customerId}</td>
                             <td class="col-name">${name}</td>
-                            <td class="col-ktp">${ktpNumber}</td>
                             <td class="col-phone">${phone}</td>
+                            <td class="col-ktp">${ktpNumber}</td>
                             <td class="col-occupation">${occupation}</td>
                             <td class="text-center">${createBtnHtml}</td>
                             <td class="text-center"><button onclick="APP.showCustomerDetailCard('${Utils.escapeAttr(c.id)}')" class="btn btn--sm">📋 ${t('detail')}</button></td>
@@ -110,8 +110,8 @@
                                             <tr>
                                                 <th class="col-id">${t('customer_id')}</th>
                                                 <th class="col-name">${t('customer_name')}</th>
-                                                <th class="col-ktp">${t('ktp_number')}</th>
                                                 <th class="col-phone">${t('phone')}</th>
+                                                <th class="col-ktp">${t('ktp_number')}</th>
                                                 <th class="col-occupation">${t('occupation')}</th>
                                                 <th class="text-center">${t('create_order_for')}</th>
                                                 <th class="text-center">${t('action')}</th>
@@ -150,8 +150,8 @@
                                         <tr>
                                             <th class="col-id">${t('customer_id')}</th>
                                             <th class="col-name">${t('customer_name')}</th>
-                                            <th class="col-ktp">${t('ktp_number')}</th>
                                             <th class="col-phone">${t('phone')}</th>
+                                            <th class="col-ktp">${t('ktp_number')}</th>
                                             <th class="col-occupation">${t('occupation')}</th>
                                             <th class="text-center">${t('create_order_for')}</th>
                                             <th class="text-center">${t('action')}</th>

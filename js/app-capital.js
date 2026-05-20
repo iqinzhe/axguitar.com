@@ -977,6 +977,7 @@
                 <h2>📈 ${lang === 'id' ? 'Laporan Keuangan Bulanan' : '月度资金健康报表'}</h2>
                 <div class="header-actions">
                     <button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button>
+                    <button onclick="JF.CapitalModule.printFundHealthReport()" class="btn btn--outline">🖨️ ${lang === 'id' ? 'Cetak' : '打印报表'}</button>
                 </div>
             </div>
 
@@ -1059,6 +1060,90 @@
                 </div>
             </div>`;
         },  // end buildFundHealthReportHTML
+
+        // ==================== 月度报表打印（横版A4）====================
+        printFundHealthReport() {
+            const lang = Utils.lang;
+            const contentEl = document.getElementById('app');
+            if (!contentEl) return;
+
+            // 克隆页面内容
+            const clone = contentEl.cloneNode(true);
+            // 移除按钮、操作区
+            clone.querySelectorAll('button, .header-actions, .page-header').forEach(el => el.remove());
+
+            const dt = new Date().toLocaleString();
+            const pw = window.open('', '_blank');
+            if (!pw) { Utils.toast.warning(lang==='id'?'Popup diblokir.':'弹出窗口被拦截，请允许后重试。', 4000); return; }
+
+            pw.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>JF! by Gadai - ${lang==='id'?'Laporan Keuangan Bulanan':'月度资金健康报表'}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8pt; color: #1e293b; }
+.print-wrap { padding: 6mm; }
+.print-header { text-align: center; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }
+.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; }
+.print-header-info { font-size: 8pt; color: #475569; margin-top: 4px; }
+.print-title { font-size: 12pt; font-weight: 800; margin: 8px 0 12px; color: #1e293b; text-align: center; }
+.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }
+
+/* 顶部摘要4格横排 */
+.summary-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 10px; }
+.summary-card { border: 1px solid #e2e8f0; border-radius: 5px; padding: 8px; text-align: center; }
+.summary-card .s-label { font-size: 7pt; color: #64748b; margin-bottom: 3px; }
+.summary-card .s-val { font-size: 12pt; font-weight: 800; }
+.summary-card .s-sub { font-size: 6.5pt; color: #94a3b8; margin-top: 2px; }
+
+/* 资金结构横排 */
+.fund-struct { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 10px; border: 1px solid #e2e8f0; border-radius: 5px; padding: 8px; }
+.fund-struct-item .fs-label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }
+.fund-struct-item .fs-val { font-size: 11pt; font-weight: 700; }
+
+/* 月度明细表 */
+.section-title { font-size: 9pt; font-weight: 700; margin: 10px 0 5px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+thead { display: table-header-group; }
+th { background: #f1f5f9; padding: 4px 6px; text-align: left; font-size: 7pt; font-weight: 700; border: 1px solid #cbd5e1; white-space: nowrap; }
+td { padding: 4px 6px; border: 1px solid #cbd5e1; font-size: 7.5pt; }
+.amount { text-align: right; font-family: monospace; }
+tbody tr:last-child { font-weight: 700; background: #f8fafc; border-top: 2px solid #94a3b8; }
+
+/* 说明框 */
+.note-box { font-size: 7pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 5px 8px; margin-top: 8px; line-height: 1.5; }
+
+@media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body { margin: 0; padding: 0; }
+    .print-wrap { padding: 0; }
+}
+</style>
+</head>
+<body>
+<div class="print-wrap">
+<div class="print-header">
+    <div class="logo">JF! by Gadai</div>
+    <div class="print-header-info">📅 ${dt}</div>
+</div>
+<div class="print-title">📈 ${lang==='id'?'Laporan Keuangan Bulanan':'月度资金健康报表'}</div>
+${clone.innerHTML}
+<div class="print-footer">JF! by Gadai — ${lang==='id'?'Sistem Manajemen Gadai':'典当管理系统'} &nbsp;|&nbsp; 1/1</div>
+</div>
+<script>
+window.onload = function() {
+    // 移除页面内的多余按钮
+    document.querySelectorAll('button,.btn,.header-actions,.page-header').forEach(function(el){el.remove();});
+    window.print();
+    setTimeout(function(){ window.close(); }, 800);
+};
+<\/script>
+</body>
+</html>`);
+            pw.document.close();
+        },
 
     };  // end CapitalModule
 
