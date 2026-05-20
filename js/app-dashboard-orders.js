@@ -622,9 +622,14 @@
             var totalCols = window._orderTableState ? window._orderTableState.totalCols : 11;
             tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</td></tr>';
             try {
-                var result = await this._fetchOrderData({ status: status }, 0, 50);
+                // 修复：overdue 在数据库里是 active 订单，需前端过滤
+                var fetchStatus = (status === 'overdue') ? 'active' : status;
+                var result = await this._fetchOrderData({ status: fetchStatus }, 0, 500);
                 var orders = result.orders;
-                var totalCount = result.totalCount;
+                if (status === 'overdue') {
+                    orders = orders.filter(function(o) { return (o.overdue_days || 0) > 0; });
+                }
+                var totalCount = (status === 'overdue') ? orders.length : result.totalCount;
                 var state = window._orderTableState || {};
                 state.filters = { status: status };
                 state.allOrders = orders;
@@ -634,6 +639,8 @@
                 this._renderOrdersIntoTable(orders, false);
                 this._updateLoadMoreRow();
                 this._clearSelection();
+                // 修复：筛选后重新绑定行点击事件
+                this._bindRowClickDelegate();
                 var sel = document.getElementById('statusFilter');
                 if (sel && sel.value !== status) sel.value = status;
             } catch (err) {
