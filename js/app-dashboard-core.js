@@ -641,7 +641,13 @@
                     };
 
                     const [allOrdersData, newThisMonthData, injectedCapitalRes, dueOrdersRes] = await Promise.all([
-                        applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at, custom_order_date, next_interest_due_date')),
+                        (async () => {
+                            try {
+                                const r = await applyFilter(client.from('orders').select('status, overdue_days, loan_amount, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, interest_paid_total, principal_paid, created_at, custom_order_date, next_interest_due_date'));
+                                if (r.error) { console.error('[KPI] 订单查询失败:', r.error); return { data: [] }; }
+                                return r;
+                            } catch (e) { console.error('[KPI] 订单查询异常:', e); return { data: [] }; }
+                        })(),
                         (async () => {
                             try {
                                 // 本月新增：取本月内创建或自定义日期在本月的订单
@@ -658,7 +664,7 @@
                         })(),
                         (async () => {
                             try {
-                                let q = client.from('capital_injections').select('amount').eq('is_voided', false);
+                                let q = client.from('capital_injections').select('amount').eq('is_voided', false).neq('source', 'profit');
                                 if (!isAdmin && storeId) q = q.eq('store_id', storeId);
                                 else if (isAdmin && practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                                 const r = await q; return (r.data || []).reduce((s, i) => s + (i.amount || 0), 0);
@@ -700,7 +706,8 @@
                             // 实时计算逾期：next_interest_due_date < 今天 才算逾期
                             if (o.next_interest_due_date && o.next_interest_due_date < todayStr) overdueOrders++;
                         } else if (o.status === 'completed') { completedOrders++; }
-                        if (o.status === 'active' || o.status === 'completed') {
+                        // 修复：active / completed / liquidated 均纳入收入统计
+                        if (o.status === 'active' || o.status === 'completed' || o.status === 'liquidated') {
                             if (o.admin_fee_paid) adminFeesCollected += (o.admin_fee || 0);
                             serviceFeesCollected += (o.service_fee_paid || 0);
                             interestCollected += (o.interest_paid_total || 0);

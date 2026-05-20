@@ -1319,7 +1319,7 @@
             const profile = await this.getCurrentProfile();
             const { data: orders, error } = await supabaseClient
                 .from('orders')
-                .select('order_id, id, store_id, customer_id, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, created_at')
+                .select('order_id, id, store_id, customer_id, admin_fee, admin_fee_paid, service_fee_amount, service_fee_paid, created_at, custom_order_date')
                 .order('created_at', { ascending: true });
             if (error) throw error;
             const total = orders.length;
@@ -1329,12 +1329,14 @@
                 const o = orders[i];
                 if (progressCallback) progressCallback({ current: i + 1, total, orderId: o.order_id, success, failed });
                 try {
+                    // 优先使用 custom_order_date，回退到 created_at
+                    const feeDate = o.custom_order_date || (o.created_at || '').substring(0, 10);
                     await this.syncFeesAfterAdminEdit(
                         o.order_id,
                         o.admin_fee || 0,
                         o.admin_fee_paid || false,
                         o.service_fee_amount || 0,
-                        (o.created_at || '').substring(0, 10)
+                        feeDate
                     );
                     success++;
                 } catch (e) {
