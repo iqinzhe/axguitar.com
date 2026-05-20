@@ -1,4 +1,4 @@
-// app-dashboard-print.js - v2.0
+// app-dashboard-print.js - v3.0
 // 修复：客户列表、订单列表、支出、资金流水打印 + 页码 + 隐藏分页器
 'use strict';
 (function () {
