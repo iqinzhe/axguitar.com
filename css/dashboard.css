@@ -236,7 +236,19 @@
     flex-direction: column;
     gap: 10px;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: clip; /* clip 不建立新滚动容器，子元素的 overflow-x:auto 仍可生效 */
+    min-width: 0;     /* 防止 flex 子项撑破父容器 */
+  }
+
+  /* 订单列表卡片：允许内部横向滚动 */
+  .order-table-card {
+    overflow: hidden; /* 裁剪圆角，但不截断滚动 */
+    min-width: 0;
+  }
+  .order-table-card .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
   }
 
   /* KPI 卡片 */
@@ -628,6 +640,7 @@
       flex-direction: column;
       gap: 10px;
       min-height: calc(100vh - 56px);
+      min-width: 0;
     }
     body.menu-open { overflow: hidden; position: fixed; width: 100%; }
 
