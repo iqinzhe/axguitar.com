@@ -390,6 +390,15 @@
   .util-bar-pct { font-weight: 700; color: var(--amber-500); }
   .util-bar-track { height: 8px; background: var(--gray-100); border-radius: 8px; overflow: hidden; }
   .util-bar-fill { height: 100%; background: var(--gradient-util-bar); border-radius: 8px; transition: width 0.6s ease; }
+  .util-bar-hint {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: var(--gray-400);
+    background: var(--gray-50); border: 1px solid var(--border-light);
+    border-radius: 6px; padding: 3px 8px; margin-top: 3px;
+  }
+  .util-bar-hint-status { font-size: 10px; font-weight: 600; }
+  .util-bar-hint-status.warn { color: #d97706; }
+  .util-bar-hint-status.ok   { color: #16a34a; }
 
   .cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0; }
   .cash-bank-item {
@@ -639,6 +648,7 @@
     .income-msg-divider, .income-msg-section { display: none !important; }
     .kpi-row { grid-template-columns: 1fr 1fr !important; gap: 8px; }
     .mid-row, .fund-total-row, .cash-bank-row { grid-template-columns: 1fr; gap: 12px; }
+    .fund-stat-row { grid-template-columns: 1fr !important; gap: 8px; }
     .income-card { margin-top: 10px; border-top: 2px solid var(--border-light); padding-top: 18px; }
     .donut-area { flex-direction: row; align-items: center; gap: 20px; }
     .donut-legend { width: auto; flex: 1; }
@@ -650,6 +660,7 @@
     .dash-topbar { padding: 0 12px; }
     .dash-main { padding: 10px 8px; }
     .kpi-row { gap: 8px; grid-template-columns: 1fr 1fr !important; }
+    .fund-stat-row { grid-template-columns: 1fr !important; }
     .kpi-card { padding: 8px 10px; }
     .kpi-val { font-size: calc(var(--font-xl) - 0.125rem); }
   }
