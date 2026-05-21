@@ -161,6 +161,14 @@
     const todayStr = () => Utils.getLocalToday();
     const nowStr = () => Utils.getLocalDateTime();
 
+    // 问题4修复：业务日期统一从此函数取，优先 custom_order_date，回退 created_at，兜底今天
+    const orderDate = (order) => {
+        if (!order) return todayStr();
+        if (order.custom_order_date) return order.custom_order_date;
+        if (order.created_at) return order.created_at.substring(0, 10);
+        return todayStr();
+    };
+
     // ==================== SupabaseAPI 主对象 ====================
     const SupabaseAPI = {
         getClient: () => supabaseClient,
@@ -792,7 +800,7 @@
                 .select('id').eq('order_id', order.id).eq('flow_type','loan_disbursement').eq('is_voided',false).maybeSingle();
             if(exist) throw new Error(Utils.t('loan_already_disbursed'));
             // 确定流水日期：优先使用传入的日期，否则使用订单创建日期
-            const recordDate = flowDate || (order.created_at ? order.created_at.substring(0, 10) : todayStr());
+            const recordDate = flowDate || orderDate(order);
             return await this.recordCashFlow({
                 store_id: order.store_id, flow_type:'loan_disbursement', direction:'outflow',
                 amount, source_target: source, order_id: order.id, customer_id: order.customer_id,
@@ -1167,7 +1175,7 @@
             const profile = await this.getCurrentProfile();
             const feeAmount = (adminFeeAmount !== undefined && adminFeeAmount !== null) ? adminFeeAmount : order.admin_fee;
             // 确定流水日期：优先使用传入的日期，否则使用订单创建日期
-            const recordDate = flowDate || (order.created_at ? order.created_at.substring(0, 10) : todayStr());
+            const recordDate = flowDate || orderDate(order);
             
             if (!feeAmount || feeAmount <= 0) {
                 const { error: e0 } = await supabaseClient.from('orders').update({
@@ -1204,7 +1212,7 @@
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
             // 确定流水日期：优先使用传入的日期，否则使用订单创建日期
-            const recordDate = flowDate || (order.created_at ? order.created_at.substring(0, 10) : todayStr());
+            const recordDate = flowDate || orderDate(order);
             
             if(order.service_fee_percent<=0 && order.service_fee_amount<=0) {
                 await supabaseClient.from('orders').update({ service_fee_paid: 0, updated_at: nowStr() }).eq('order_id', orderId);
@@ -1242,7 +1250,7 @@
         async syncFeesAfterAdminEdit(orderId, newAdminFee, newAdminFeePaid, newServiceFeeAmount, orderDate) {
             const order = await this.getOrder(orderId);
             const profile = await this.getCurrentProfile();
-            const feeDate = (orderDate || (order.created_at || '').substring(0, 10) || todayStr());
+            const feeDate = (orderDate || orderDate(order));
 
             await supabaseClient.from('payment_history')
                 .delete().eq('order_id', order.id).eq('type', 'admin_fee');
@@ -1330,7 +1338,7 @@
                 const o = orders[i];
                 if (progressCallback) progressCallback({ current: i + 1, total, orderId: o.order_id, success, failed });
                 try {
-                    const feeDate = (o.created_at || '').substring(0, 10);
+                    const feeDate = orderDate(o);
                     await this.syncFeesAfterAdminEdit(
                         o.order_id,
                         o.admin_fee || 0,
@@ -1400,7 +1408,7 @@
                     principal_remaining: currentOrder.principal_remaining,
                     status: currentOrder.status
                 };
-                const nextDue = this.calculateNextDueDate(currentOrder.created_at, newPaidMonths);
+                const nextDue = this.calculateNextDueDate(orderDate(currentOrder), newPaidMonths);
                 const updates = {
                     interest_paid_months: newPaidMonths,
                     interest_paid_total: newPaidTotal,
@@ -1541,7 +1549,7 @@
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
             // 确定流水日期：优先使用订单创建日期，否则用当天
-            const recordDate = order.created_at ? order.created_at.substring(0, 10) : todayStr();
+            const recordDate = orderDate(order);
             
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1570,7 +1578,7 @@
                 fixed_paid_months: newFixedPaid, monthly_interest: newMonthlyInterest,
                 interest_paid_months: (order.interest_paid_months||0) + 1,
                 interest_paid_total: (order.interest_paid_total||0) + interestAmt,
-                next_interest_due_date: this.calculateNextDueDate(order.created_at, newFixedPaid),
+                next_interest_due_date: this.calculateNextDueDate(orderDate(order), newFixedPaid),
                 updated_at: nowStr()
             };
             if(isCompleted){ updates.status='completed'; updates.fund_status='returned'; updates.completed_at=nowStr(); }
@@ -1616,7 +1624,7 @@
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
             // 确定流水日期：优先使用订单创建日期，否则用当天
-            const recordDate = order.created_at ? order.created_at.substring(0, 10) : todayStr();
+            const recordDate = orderDate(order);
             
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1685,7 +1693,7 @@
                 : remainingPrincipal;
             if (paidAmount <= 0) throw new Error(Utils.t('invalid_amount'));
             
-            const recordDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
+            const recordDate = orderDate(order);
             
             await supabaseClient.from('payment_history').insert({
                 order_id: order.id, date: recordDate, type:'principal',
@@ -2560,7 +2568,7 @@
 
         let created = 0;
         for (const order of missingOrders) {
-            const flowDate = order.created_at ? order.created_at.substring(0, 10) : Utils.getLocalToday();
+            const flowDate = orderDate(order);
             const description = Utils.lang === 'id'
                 ? `Pencairan gadai (perbaikan otomatis) - ${order.order_id}`
                 : `当金发放 (自动补录) - ${order.order_id}`;

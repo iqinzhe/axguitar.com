@@ -459,6 +459,7 @@
                 this.saveCurrentPageState();
             } catch (err) {
                 console.error('[refreshCurrentPage] 渲染失败，自动返回仪表盘:', err);
+                Utils.toast.warning(Utils.lang === 'id' ? '⚠️ Halaman gagal dimuat, kembali ke dashboard.' : '⚠️ 页面加载失败，已返回仪表盘。');
                 this.currentOrderId = null; this.currentCustomerId = null; this.clearPageState();
                 await this.originalRenderDashboard();
             }
