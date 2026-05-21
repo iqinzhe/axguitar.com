@@ -267,6 +267,8 @@
   .order-table .col-status { width: 8%; }
   .order-table .col-store  { width: 10%; }
   .order-table-card .table-container { overflow-x: visible; }
+  /* 表头统一风格：全部居中对齐，字重/大小由 .data-table thead th 统一控制 */
+  .order-table thead th    { text-align: center; }
 
   /* ---------- 徽章系统 ---------- */
   .badge {
