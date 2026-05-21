@@ -83,6 +83,9 @@
                 if (isOverdue) displayStatus = 'overdue';
                 var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
                 var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
+                var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
+                var startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
+                var interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
                 var rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
