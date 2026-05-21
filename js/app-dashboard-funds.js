@@ -44,41 +44,35 @@
         },
 
         // ==================== 构建资金流水页面 HTML ====================
+        // 抽取公共方法：按角色权限查询现金流水，消除重复代码
+        async _fetchCashFlowData() {
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = PERMISSION.isAdmin();
+            const isStaff = PERMISSION.isStaff();
+            const client = SUPABASE.getClient();
+            let q = client.from('cash_flow_records').select('*, stores(name)')
+                .eq('is_voided', false)
+                .order('flow_date', { ascending: false })
+                .order('recorded_at', { ascending: false });
+            if (isAdmin) {
+                const practiceIds = await SUPABASE._getPracticeStoreIds();
+                if (practiceIds.length > 0) q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
+            } else if (isStaff) {
+                q = q.eq('store_id', profile?.store_id).eq('recorded_by', profile?.id);
+            } else {
+                q = q.eq('store_id', profile?.store_id);
+            }
+            const { data } = await q;
+            return data || [];
+        },
+
         async buildCashFlowPageHTML() {
             const lang = Utils.lang;
-            const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
             const isStaff = PERMISSION.isStaff();
 
             try {
-                let cashFlowTransactions = [];
-                const client = SUPABASE.getClient();
-
-                if (isAdmin) {
-                    let q = client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('is_voided', false).order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    const practiceIds = await SUPABASE._getPracticeStoreIds();
-                    if (practiceIds.length > 0) {
-                        q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                    }
-                    const { data: allFlows } = await q;
-                    cashFlowTransactions = allFlows || [];
-                } else if (isStaff) {
-                    const { data: staffFlows } = await client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('store_id', profile?.store_id)
-                        .eq('is_voided', false)
-                        .eq('recorded_by', profile?.id)
-                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    cashFlowTransactions = staffFlows || [];
-                } else {
-                    const { data: storeFlows } = await client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('store_id', profile?.store_id).eq('is_voided', false)
-                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    cashFlowTransactions = storeFlows || [];
-                }
+                const cashFlowTransactions = await this._fetchCashFlowData();
 
                 const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
                 const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
@@ -751,7 +745,6 @@
                 const gap = totalCashOut - deployedCapital;
 
                 const activeOrderUUIDs  = new Set((activeOrders||[]).map(o=>o.id));
-                const completedOrderUUIDs = new Set();
                 const { data: allOrderUUIDs } = await client.from('orders').select('id');
                 const allExistingUUIDs = new Set((allOrderUUIDs||[]).map(o=>o.id));
 
@@ -815,7 +808,7 @@
                         <td ${tdS}>${Utils.formatDate(o.created_at)}</td>
                         <td style="padding:7px 10px;font-size:12px;color:var(--warning-dark,#b45309);">⚠️ 缺少发放流水</td>
                     </tr>`).join('') :
-                    `<td><td colspan="5" style="text-align:center;padding:14px;color:var(--success);font-size:13px;">✅ 所有在押订单均有发放流水</td></tr>`;
+                    `<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--success);font-size:13px;">✅ 所有在押订单均有发放流水</td></tr>`;
 
                 let outRows = Object.entries(outflowGroups).sort((a,b)=>b[1].total-a[1].total).map(([k,g])=>`
                     <tr style="${k==='loan_disbursement'?'background:var(--warning-soft,#fffbeb);':''}border-bottom:1px solid var(--border-light);">
@@ -987,44 +980,17 @@
 
         async showCapitalModal() {
             const lang = Utils.lang;
-            const profile = await SUPABASE.getCurrentProfile();
             const isAdmin = PERMISSION.isAdmin();
             const isStaff = PERMISSION.isStaff();
             try {
-                let capitalTransactions = [];
-                const client = SUPABASE.getClient();
-                if (isAdmin) {
-                    let q = client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('is_voided', false).order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    const practiceIds = await SUPABASE._getPracticeStoreIds();
-                    if (practiceIds.length > 0) {
-                        q = q.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
-                    }
-                    const { data: allFlows } = await q;
-                    capitalTransactions = allFlows || [];
-                } else if (isStaff) {
-                    const { data: staffFlows } = await client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('store_id', profile?.store_id)
-                        .eq('is_voided', false)
-                        .eq('recorded_by', profile?.id)
-                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    capitalTransactions = staffFlows || [];
-                } else {
-                    const { data: storeFlows } = await client
-                        .from('cash_flow_records').select('*, stores(name)')
-                        .eq('store_id', profile?.store_id).eq('is_voided', false)
-                        .order('flow_date', { ascending: false }).order('recorded_at', { ascending: false });
-                    capitalTransactions = storeFlows || [];
-                }
+                const capitalTransactions = await this._fetchCashFlowData();
 
                 const directionMap = { inflow: lang === 'id' ? '📥 Masuk' : '📥 流入', outflow: lang === 'id' ? '📤 Keluar' : '📤 流出' };
                 const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
 
                 let rows = '';
                 if (capitalTransactions.length === 0) {
-                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                    rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
                 } else {
                     for (const t of capitalTransactions) {
                         const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
@@ -1141,11 +1107,11 @@
             const sourceMap = { cash: lang === 'id' ? '🏦 Brankas' : '🏦 保险柜', bank: lang === 'id' ? '🏧 Bank BNI' : '🏧 银行BNI' };
             let rows = '';
             if (transactions.length === 0) {
-                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td>`;
+                rows = `<tr><td colspan="${isAdmin ? 7 : 6}" class="text-center">${lang === 'id' ? 'Tidak ada transaksi' : '暂无交易记录'}</td></tr>`;
             } else {
                 for (const t of transactions) {
                     const typeDisplay = FundsPage._getFlowTypeDisplay(t.flow_type, lang);
-                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td class="col-type">${typeDisplay}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}<td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
+                    rows += `<tr><td class="date-cell">${Utils.formatDate(t.flow_date || t.recorded_at)}</td><td class="col-type">${typeDisplay}</td><td class="text-center">${directionMap[t.direction] || t.direction}</td><td class="text-center">${sourceMap[t.source_target] || t.source_target}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
                 }
             }
             tbody.innerHTML = rows;
@@ -1302,7 +1268,7 @@
             const typeMap = { cash_to_bank: lang === 'id' ? '🏦→🏧 Kas ke Bank' : '🏦→🏧 现金存入银行', bank_to_cash: lang === 'id' ? '🏧→🏦 Tarik Tunai' : '🏧→🏦 银行取出现金', store_to_hq: lang === 'id' ? '🏢 Setoran ke Pusat' : '🏢 上缴总部' };
             let rows = '';
             if (transfers.length === 0) {
-                rows = `<td><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td>`;
+                rows = `<tr><td colspan="${isAdmin ? 6 : 5}" class="text-center">${lang === 'id' ? 'Tidak ada riwayat transfer' : '暂无转账记录'}</td></tr>`;
             } else {
                 for (const t of transfers) {
                     rows += `<tr><td class="date-cell">${Utils.formatDate(t.transfer_date)}</td><td class="text-center">${typeMap[t.transfer_type] || t.transfer_type}</td><td class="amount">${Utils.formatCurrency(t.amount)}</td><td class="desc-cell">${Utils.escapeHtml(t.description || '-')}</td><td class="text-center">${Utils.escapeHtml(t.created_by_profile?.name || '-')}</td>${isAdmin ? `<td class="text-center">${Utils.escapeHtml(t.stores?.name || '-')}</td>` : ''}</tr>`;
