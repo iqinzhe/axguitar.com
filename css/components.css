@@ -253,19 +253,20 @@
   .col-collateral   { width: 15%; }
   .col-occupation   { width: 12%; }
 
-  /* 订单列表表格：固定最小宽度，超出时由 table-container 横向滚动接管 */
+  /* 订单列表表格：网页端自适应宽度，无横向滚动；手机端保留横向滚动 */
   .order-table {
-    min-width: 1100px;
+    width: 100%;
     table-layout: fixed;
   }
-  .order-table .col-id     { width: 96px; }
-  .order-table .col-name   { width: 140px; }
+  .order-table .col-id     { width: 9%; }
+  .order-table .col-name   { width: 12%; }
   .order-table th:nth-child(3),
-  .order-table td:nth-child(3) { width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .order-table .col-amount { width: 108px; }
-  .order-table .col-months { width: 86px; }
-  .order-table .col-date   { width: 94px; white-space: nowrap; }
-  .order-table .col-status { width: 78px; }
+  .order-table td:nth-child(3) { width: 10%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .order-table .col-amount { width: 10%; }
+  .order-table .col-months { width: 7%; }
+  .order-table .col-date   { width: 8%; white-space: nowrap; }
+  .order-table .col-status { width: 7%; }
+  .order-table-card .table-container { overflow-x: visible; }
 
   /* ---------- 徽章系统 ---------- */
   .badge {
@@ -1777,6 +1778,8 @@
         margin: var(--spacing-2) 0;
         border-radius: var(--radius-md);
     }
+    /* 手机端订单卡片恢复横向滚动 */
+    .order-table-card .table-container { overflow-x: auto; }
     
     /* 表格设置最小宽度，强制水平滚动 */
     .data-table,

@@ -236,19 +236,14 @@
     flex-direction: column;
     gap: 10px;
     overflow-y: auto;
-    overflow-x: clip; /* clip 不建立新滚动容器，子元素的 overflow-x:auto 仍可生效 */
-    min-width: 0;     /* 防止 flex 子项撑破父容器 */
-  }
-
-  /* 订单列表卡片：允许内部横向滚动 */
-  .order-table-card {
-    overflow: hidden; /* 裁剪圆角，但不截断滚动 */
     min-width: 0;
   }
-  .order-table-card .table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: 100%;
+
+  /* 订单列表卡片：网页端不横向滚动，撑满宽度 */
+  .order-table-card {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   /* KPI 卡片 */
