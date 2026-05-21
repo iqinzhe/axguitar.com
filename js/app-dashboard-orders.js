@@ -11,10 +11,17 @@
     var OrdersPage = {
         // ==================== 获取订单数据 ====================
         _fetchOrderData: async function(filters, from, to) {
-            var result = await SUPABASE.getOrders(filters, from, to);
+            // overdue 不是数据库状态值，需转为 active 查询后前端过滤
+            var isOverdueFilter = (filters.status === 'overdue');
+            var dbFilters = isOverdueFilter ? Object.assign({}, filters, { status: 'active' }) : filters;
+            var result = await SUPABASE.getOrders(dbFilters, from, to);
+            var orders = result.data;
+            if (isOverdueFilter) {
+                orders = orders.filter(function(o) { return (o.overdue_days || 0) > 0; });
+            }
             return {
-                orders: result.data,
-                totalCount: result.totalCount
+                orders: orders,
+                totalCount: isOverdueFilter ? orders.length : result.totalCount
             };
         },
 
@@ -599,39 +606,8 @@
             var isAdmin = PERMISSION.isAdmin();
             if (!isAdmin && status !== 'active') status = 'active';
             APP.currentFilter = status;
-            var lang = Utils.lang;
-            var tbody = document.getElementById('orderTableBody');
-            if (!tbody) { this.showOrderTable(); return; }
-            var isAdmin2 = PERMISSION.isAdmin();
-            var totalCols = isAdmin2 ? 9 : 8;
-            if (window._orderTableState) window._orderTableState.totalCols = totalCols;
-            tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</td></tr>';
-            try {
-                // 修复：overdue 在数据库里是 active 订单，需前端过滤
-                var fetchStatus = (status === 'overdue') ? 'active' : status;
-                var result = await this._fetchOrderData({ status: fetchStatus }, 0, 500);
-                var orders = result.orders;
-                if (status === 'overdue') {
-                    orders = orders.filter(function(o) { return (o.overdue_days || 0) > 0; });
-                }
-                var totalCount = (status === 'overdue') ? orders.length : result.totalCount;
-                var state = window._orderTableState || {};
-                state.filters = { status: status };
-                state.allOrders = orders;
-                state.currentFrom = orders.length;
-                state.totalCount = totalCount;
-                window._orderTableState = state;
-                this._renderOrdersIntoTable(orders, false);
-                this._updateLoadMoreRow();
-                this._clearSelection();
-                // 修复：筛选后重新绑定行点击事件
-                this._bindRowClickDelegate();
-                var sel = document.getElementById('statusFilter');
-                if (sel && sel.value !== status) sel.value = status;
-            } catch (err) {
-                console.error('filterOrders error:', err);
-                tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--danger);">❌ ' + (lang === 'id' ? 'Gagal memuat data' : '加载失败，请重试') + '</td></tr>';
-            }
+            // 直接重新渲染整张表，避免依赖 _orderTableState 中间状态导致的各种问题
+            await this.showOrderTable({ status: status });
         },
 
         viewOrder: async function(orderId) {
