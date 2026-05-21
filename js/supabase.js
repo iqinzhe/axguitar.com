@@ -507,14 +507,16 @@
             if(!supabaseClient) return [];
             const profile = await this.getCurrentProfile();
             try {
-                const { data: bl } = await supabaseClient.from('blacklist').select('customer_id');
-                const blackIds = (bl||[]).map(b=>b.customer_id);
+                // 用子查询在数据库侧排除黑名单客户，避免全量拉取黑名单
+                const { data: bl } = await supabaseClient
+                    .from('blacklist').select('customer_id');
+                const blackIds = (bl || []).map(b => b.customer_id).filter(Boolean);
                 let q = supabaseClient.from('customers').select('*').order('registered_date', { ascending: false });
-                if(profile?.role !== 'admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
-                if(blackIds.length) q = q.not('id','in',`(${blackIds.join(',')})`);
+                if (profile?.role !== 'admin' && profile?.store_id) q = q.eq('store_id', profile.store_id);
+                if (blackIds.length) q = q.not('id', 'in', `(${blackIds.join(',')})`);
                 const { data } = await q;
-                return data;
-            } catch(e){ return []; }
+                return data || [];
+            } catch(e) { return []; }
         },
 
         async getCustomer(customerId) {
@@ -1317,7 +1319,7 @@
                 order.admin_fee || 0,
                 order.admin_fee_paid || false,
                 order.service_fee_amount || 0,
-                (order.created_at || '').substring(0, 10)
+                orderDate(order)
             );
             if (window.Audit) await window.Audit.log('repair_order_fees', JSON.stringify({ order_id: orderId, admin_fee: order.admin_fee, service_fee: order.service_fee_amount }));
             return true;
@@ -1661,7 +1663,6 @@
             }).eq('order_id', orderId);
             if(error) throw error;
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remaining, paymentMethod);
-            Utils.toast.success(Utils.lang==='id'?'Pelunasan dipercepat berhasil!':'提前结清成功！');
             return true;
         },
 
@@ -1726,7 +1727,6 @@
             if(error) throw error;
             
             if(window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement_flexible', paidAmount, paymentMethod);
-            Utils.toast.success(Utils.lang === 'id' ? '✅ Pelunasan berhasil!' : '✅ 结清成功！');
             return true;
         },
         
@@ -2158,18 +2158,28 @@
             if (profile?.role !== 'admin' && profile?.store_id) query = query.eq('store_id', profile.store_id);
             const { data: orders, error } = await query;
             if (error) throw error;
+
             const today = new Date(); today.setHours(0, 0, 0, 0);
-            const needRemind = [];
-            for (const order of (orders || [])) {
-                if (!order.next_interest_due_date) continue;
+            const todayStr = Utils.getLocalToday();
+
+            // 候选订单：到期日距今恰好 reminderDays 天
+            const candidates = (orders || []).filter(order => {
+                if (!order.next_interest_due_date) return false;
                 const due = new Date(order.next_interest_due_date); due.setHours(0, 0, 0, 0);
-                const daysUntilDue = Math.ceil((due - today) / 86400000);
-                if (daysUntilDue === reminderDays) {
-                    const alreadySent = await this.hasReminderSentToday(order.id);
-                    if (!alreadySent) needRemind.push(order);
-                }
-            }
-            return needRemind;
+                return Math.ceil((due - today) / 86400000) === reminderDays;
+            });
+            if (!candidates.length) return [];
+
+            // 一次性批量查出今天已发送的提醒，避免 N+1 查询
+            const candidateIds = candidates.map(o => o.id);
+            const { data: sentToday } = await supabaseClient
+                .from('reminder_logs')
+                .select('order_id')
+                .eq('reminder_date', todayStr)
+                .in('order_id', candidateIds);
+            const sentSet = new Set((sentToday || []).map(r => r.order_id));
+
+            return candidates.filter(o => !sentSet.has(o.id));
         },
 
         async getStoreName(storeId) {
@@ -2277,60 +2287,7 @@
                 store_id: storeId
             });
         },
-
-        async ensureInterestShortfallColumn() {
-            try {
-                const session = await this.getSession();
-                if (!session) return;
-                
-                const { data, error } = await supabaseClient
-                    .from('orders')
-                    .select('interest_shortfall')
-                    .limit(1);
-                    
-                if (error) {
-                    if (error.message && error.message.includes('column "interest_shortfall" does not exist')) {
-                        try {
-                            let rpcExists = false;
-                            try {
-                                const { data: funcCheck } = await supabaseClient.rpc('check_function_exists', { 
-                                    function_name: 'add_interest_shortfall_column' 
-                                });
-                                rpcExists = !!funcCheck;
-                            } catch (checkErr) {
-                                console.warn('[Supabase] 无法检查 RPC 是否存在，尝试直接调用');
-                                rpcExists = true;
-                            }
-                            
-                            if (rpcExists) {
-                                const { error: alterError } = await supabaseClient.rpc('add_interest_shortfall_column');
-                                if (alterError) {
-                                    console.warn('[Supabase] 无法自动添加 interest_shortfall 列');
-                                    console.warn('[Supabase] 请在 Supabase SQL Editor 中执行:');
-                                    console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
-                                }
-                            } else {
-                                console.warn('[Supabase] RPC 函数 add_interest_shortfall_column 不存在');
-                                console.warn('[Supabase] 请在 Supabase SQL Editor 中执行:');
-                                console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
-                            }
-                        } catch (alterException) {
-                            console.warn('[Supabase] 添加列失败:', alterException.message);
-                            console.warn('[Supabase] 请在 Supabase SQL Editor 中手动执行:');
-                            console.warn('ALTER TABLE orders ADD COLUMN interest_shortfall BIGINT DEFAULT 0;');
-                        }
-                    } else if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
-                    } else {
-                        console.warn('[Supabase] 列检查查询失败:', error.message);
-                    }
-                }
-            } catch (e) {
-                console.warn('[Supabase] 检查 interest_shortfall 列异常:', e.message);
-            }
-        },
     };
-
-    setTimeout(() => safeQuery(() => SupabaseAPI.ensureInterestShortfallColumn?.()), 5000);
 
     // ==================== 管理员：逐条同步缴费记录（利息/本金）====================
     SupabaseAPI.adminSyncPaymentRecords = async function(orderId, editedRecords) {
