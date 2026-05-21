@@ -67,7 +67,7 @@
                 storeMap[s.id] = s.name;
             }
 
-            var totalCols = isAdmin ? 12 : 11;
+            var totalCols = isAdmin ? 9 : 8;
             var statusMap = {
                 active: t('status_active'),
                 completed: t('status_completed'),
@@ -83,28 +83,17 @@
                 if (isOverdue) displayStatus = 'overdue';
                 var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
                 var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
-                var nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
-                var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
-                var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
-                var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
-                var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
-                var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
-
                 var rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
                 rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
+                    '<td class="date-cell text-center">' + startDate + '</td>' +
                     '<td class="col-name">' + Utils.escapeHtml(o.customer_name) + '</td>' +
-                    '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
                     '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
-                    '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterest) + '</td>' +
-                    '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
-                    '<td class="date-cell text-center">' + nextDueDate + '</td>' +
-                    '<td class="text-center"><span class="badge badge--' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
-                    '<td class="text-center">' + adminFeeStatus + '</td>' +
-                    '<td class="text-center">' + serviceFeeStatus + '</td>' +
+                    '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(remainingPrincipal) + '</td>' +
+                    '<td class="text-center">' + interestRatePct + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
@@ -179,15 +168,12 @@
                 '<thead>' +
                 '<tr>' +
                 '<th class="col-id">' + t('order_id') + '</th>' +
+                '<th class="col-date text-center">' + (lang === 'id' ? 'Tgl Mulai' : '起始日期') + '</th>' +
                 '<th class="col-name">' + t('customer_name') + '</th>' +
-                '<th>' + t('collateral_name') + '</th>' +
                 '<th class="col-amount amount">' + t('loan_amount') + '</th>' +
-                '<th class="col-amount amount">' + (lang === 'id' ? 'Bunga Bulanan' : '月利息') + '</th>' +
-                '<th class="col-months text-center">' + (lang === 'id' ? 'Bunga Dibayar' : '已付利息') + '</th>' +
-                '<th class="col-date text-center">' + t('payment_due_date') + '</th>' +
-                '<th class="col-status text-center">' + t('repayment_type') + '</th>' +
-                '<th class="col-status text-center">📋 ' + (lang === 'id' ? 'Admin Fee' : '管理费') + '</th>' +
-                '<th class="col-status text-center">✨ ' + (lang === 'id' ? 'Service Fee' : '服务费') + '</th>' +
+                '<th class="col-collat">' + t('collateral_name') + '</th>' +
+                '<th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '未还本金') + '</th>' +
+                '<th class="col-rate text-center">' + (lang === 'id' ? 'Suku Bunga' : '利率') + '</th>' +
                 '<th class="col-status text-center">' + t('status') + '</th>' +
                 (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
                 '</tr>' +
@@ -320,25 +306,22 @@
                 var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
                 var nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
-                var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Fleksibel' : '灵活');
-                var repaymentClass = o.repayment_type === 'fixed' ? 'fixed' : 'flexible';
-                var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
-                var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
+                var startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
+                var interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
                 var rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
+                var remainingPrincipal2 = (o.loan_amount || 0) - (o.principal_paid || 0);
+                var startDate2 = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
+                var interestRatePct2 = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
                 rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
+                    '<td class="date-cell text-center">' + startDate2 + '</td>' +
                     '<td class="col-name">' + Utils.escapeHtml(o.customer_name) + '</td>' +
-                    '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
                     '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
-                    '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterest) + '</td>' +
-                    '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bln' : '个月') + '</td>' +
-                    '<td class="date-cell text-center">' + nextDueDate + '</td>' +
-                    '<td class="text-center"><span class="badge badge--' + repaymentClass + '">' + repaymentTypeText + '</span></td>' +
-                    '<td class="text-center">' + adminFeeStatus + '</td>' +
-                    '<td class="text-center">' + serviceFeeStatus + '</td>' +
+                    '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(remainingPrincipal2) + '</td>' +
+                    '<td class="text-center">' + interestRatePct2 + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
