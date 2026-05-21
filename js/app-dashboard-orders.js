@@ -170,15 +170,15 @@
                 '<table class="data-table order-table">' +
                 '<thead>' +
                 '<tr>' +
-                '<th class="col-id">' + t('order_id') + '</th>' +
-                '<th class="col-date text-center">' + (lang === 'id' ? 'Tgl Mulai' : '起始日期') + '</th>' +
-                '<th class="col-name">' + t('customer_name') + '</th>' +
-                '<th class="col-amount amount">' + t('loan_amount') + '</th>' +
+                '<th class="col-id">'     + t('order_id') + '</th>' +
+                '<th class="col-date">'   + (lang === 'id' ? 'Tgl Mulai' : '起始日期') + '</th>' +
+                '<th class="col-name">'   + t('customer_name') + '</th>' +
+                '<th class="col-amount">' + t('loan_amount') + '</th>' +
                 '<th class="col-collat">' + t('collateral_name') + '</th>' +
-                '<th class="col-amount amount">' + (lang === 'id' ? 'Sisa Pokok' : '未还本金') + '</th>' +
-                '<th class="col-rate text-center">' + (lang === 'id' ? 'Suku Bunga' : '利率') + '</th>' +
-                '<th class="col-status text-center">' + t('status') + '</th>' +
-                (isAdmin ? '<th class="col-store text-center">' + t('store') + '</th>' : '') +
+                '<th class="col-amount">' + (lang === 'id' ? 'Sisa Pokok' : '未还本金') + '</th>' +
+                '<th class="col-rate">'   + (lang === 'id' ? 'Suku Bunga' : '利率') + '</th>' +
+                '<th class="col-status">' + t('status') + '</th>' +
+                (isAdmin ? '<th class="col-store">' + t('store') + '</th>' : '') +
                 '</tr>' +
                 '</thead>' +
                 '<tbody id="orderTableBody">' + rows + '</tbody>' +
@@ -314,17 +314,14 @@
                 var rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
-                var remainingPrincipal2 = (o.loan_amount || 0) - (o.principal_paid || 0);
-                var startDate2 = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
-                var interestRatePct2 = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
                 rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
                     '<td class="order-id">' + Utils.escapeHtml(o.order_id) + '</td>' +
-                    '<td class="date-cell text-center">' + startDate2 + '</td>' +
+                    '<td class="date-cell text-center">' + startDate + '</td>' +
                     '<td class="col-name">' + Utils.escapeHtml(o.customer_name) + '</td>' +
                     '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
                     '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
-                    '<td class="amount">' + Utils.formatCurrency(remainingPrincipal2) + '</td>' +
-                    '<td class="text-center">' + interestRatePct2 + '</td>' +
+                    '<td class="amount">' + Utils.formatCurrency(remainingPrincipal) + '</td>' +
+                    '<td class="text-center">' + interestRatePct + '</td>' +
                     '<td class="text-center"><span class="badge badge--' + displayStatus + '">' + statusText + '</span></td>' +
                     (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeName) + '</td>' : '') +
                     '</tr>';
@@ -605,7 +602,9 @@
             var lang = Utils.lang;
             var tbody = document.getElementById('orderTableBody');
             if (!tbody) { this.showOrderTable(); return; }
-            var totalCols = window._orderTableState ? window._orderTableState.totalCols : 11;
+            var isAdmin2 = PERMISSION.isAdmin();
+            var totalCols = isAdmin2 ? 9 : 8;
+            if (window._orderTableState) window._orderTableState.totalCols = totalCols;
             tbody.innerHTML = '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:24px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</td></tr>';
             try {
                 // 修复：overdue 在数据库里是 active 订单，需前端过滤
