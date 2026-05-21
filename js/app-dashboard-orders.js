@@ -14,7 +14,9 @@
             // overdue 不是数据库状态值，需转为 active 查询后前端过滤
             var isOverdueFilter = (filters.status === 'overdue');
             var dbFilters = isOverdueFilter ? Object.assign({}, filters, { status: 'active' }) : filters;
+            console.log('[DEBUG] _fetchOrderData 请求 filters=', JSON.stringify(dbFilters), 'from=', from, 'to=', to);
             var result = await SUPABASE.getOrders(dbFilters, from, to);
+            console.log('[DEBUG] getOrders 返回 totalCount=', result.totalCount, 'data.length=', result.data ? result.data.length : 'null', '首条status=', result.data && result.data[0] ? result.data[0].status : 'N/A');
             var orders = result.data;
             if (isOverdueFilter) {
                 orders = orders.filter(function(o) { return (o.overdue_days || 0) > 0; });
@@ -605,9 +607,9 @@
         filterOrders: async function(status) {
             var isAdmin = PERMISSION.isAdmin();
             if (!isAdmin && status !== 'active') status = 'active';
+            console.log('[DEBUG] filterOrders 被调用 status=', status, 'isAdmin=', isAdmin);
             APP.currentFilter = status;
-            // 直接重新渲染整张表，避免依赖 _orderTableState 中间状态导致的各种问题
-            await this.showOrderTable({ status: status });
+            await this.showOrderTable();
         },
 
         viewOrder: async function(orderId) {
