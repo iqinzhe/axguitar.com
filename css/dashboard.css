@@ -562,7 +562,7 @@
       align-items: stretch;
     }
     /* Row 1 */
-    .fund-flow-card    { grid-column: 1 / span 30;  grid-row: 1; }
+    .fund-flow-card    { grid-column: 1 / span 30;  grid-row: 1; align-self: start; }
     .income-card       { grid-column: 31 / span 14; grid-row: 1 / 3; } /* 跨两行 */
     /* Row 2：订单状态 + 消息中心 并排在资金结构总览下方 */
     .order-status-card   { grid-column: 1 / span 16;  grid-row: 2; }
