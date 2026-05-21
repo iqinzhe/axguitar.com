@@ -99,11 +99,11 @@
             let row = '<tr>';
             for (let c = 0; c < 7; c++) {
                 if (r === 0 && c < startIndex) {
-                    row += '<td><\/td>';
+                    row += '<td></td>';
                     continue;
                 }
                 if (day > totalDays) {
-                    row += '<td><\/td>';
+                    row += '<td></td>';
                     continue;
                 }
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -117,7 +117,7 @@
                     const dotClass = isPast ? 'cal-due-count cal-overdue' : 'cal-due-count';
                     cellContent += `<span class="${dotClass}" data-date="${dateStr}" title="${count} ${lang==='id'?'pesanan':'orders'}">${count}</span>`;
                 }
-                row += `<td class="cal-cell${count>0?' has-due':''}${isPast?' is-overdue':''}${isToday?' is-today':''}">${cellContent}<\/td>`;
+                row += `<td class="cal-cell${count>0?' has-due':''}${isPast?' is-overdue':''}${isToday?' is-today':''}">${cellContent}</td>`;
                 day++;
             }
             row += '</tr>';
@@ -387,7 +387,7 @@
                         const isAdm = window.PERMISSION?.isAdmin?.() || false;
                         let filterStatus = this.currentFilter;
                         if (!filterStatus) filterStatus = isAdm ? 'all' : 'active';
-                        if (!isAdm && filterStatus !== 'active') filterStatus = 'active';
+                        // 修复：门店账户也可筛选所有状态，数据范围由 getOrders 的 store_id 控制
                         this.currentFilter = filterStatus;
                         contentHtml = await JF.OrdersPage.buildOrderTableHTML({ status: filterStatus }, 0, 50);
                         await this._updateMainContent(contentHtml);
@@ -474,9 +474,12 @@
                 if (match && match[1] === this.currentPage) item.classList.add('active');
                 else item.classList.remove('active');
             }
-            const activeOrders = await this._getActiveOrdersCount();
+            // 优先从已有徽章读取（仪表盘渲染时已内嵌），避免重复查询
             const badgeSpan = document.querySelector('.nav-item[onclick*="orderTable"] .nav-badge');
-            if (badgeSpan) badgeSpan.textContent = activeOrders || '';
+            if (badgeSpan) return; // 已有徽章，不重复查询
+            const activeOrders = await this._getActiveOrdersCount();
+            const newBadge = document.querySelector('.nav-item[onclick*="orderTable"] .nav-badge');
+            if (newBadge) newBadge.textContent = activeOrders || '';
         },
 
         async _getActiveOrdersCount() {
@@ -737,6 +740,7 @@
                 const deployed = kpiReport.deployed_capital;
                 const available = kpiReport.available_capital;
                 const utilizationRate = injected > 0 ? ((deployed / injected) * 100).toFixed(1) : '0';
+                // 保险柜/银行初始值为0，由 detailsPromise 异步更新 DOM（见文件末尾 .then() 调用）
                 const cashBalance = 0, bankBalance = 0, cashIncome = 0, cashExpense = 0, bankIncome = 0, bankExpense = 0;
                 const activeNormal = activeOrders - overdueOrders;
 
@@ -761,21 +765,13 @@
                 const activeBadgeCount = activeOrders;
 
                 let quickActions = [];
-                if (isAdmin) {
-                    quickActions = [
-                        { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
-                        { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
-                        { icon: '💰', label: lang === 'id' ? 'Arus Kas' : '资金流水', action: "JF.DashboardCore.navigateTo('paymentHistory')", cls: '' },
-                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
-                    ];
-                } else {
-                    quickActions = [
-                        { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
-                        { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
-                        { icon: '💰', label: lang === 'id' ? 'Arus Kas' : '资金流水', action: "JF.DashboardCore.navigateTo('paymentHistory')", cls: '' },
-                        { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
-                    ];
-                }
+                // admin 和门店账户快捷操作相同
+                quickActions = [
+                    { icon: '👥', label: t('customers'), action: "JF.DashboardCore.navigateTo('customers')", cls: '' },
+                    { icon: '📋', label: t('order_list'), action: "JF.DashboardCore.navigateTo('orderTable')", cls: '' },
+                    { icon: '💰', label: lang === 'id' ? 'Arus Kas' : '资金流水', action: "JF.DashboardCore.navigateTo('paymentHistory')", cls: '' },
+                    { icon: '📝', label: lang === 'id' ? 'Pengeluaran Baru' : '新增支出', action: "JF.DashboardCore.navigateTo('expenses')", cls: '' },
+                ];
                 const quickActionsHtml = quickActions.map(q => `<div class="quick-btn${q.cls ? ' ' + q.cls : ''}" onclick="${q.action}"><span class="qb-icon">${q.icon}</span><span class="qb-label">${q.label}</span></div>`).join('');
 
                 const totalIncomeInitial = kpiReport.admin_fees_collected + kpiReport.service_fees_collected + kpiReport.interest_collected;
