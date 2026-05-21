@@ -267,10 +267,6 @@
             if (paginator) paginator.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? '加载中...' : '加载中...') + '</div>';
             try {
                 var html = await JF.OrdersPage.buildOrderTableHTML(state.filters, page, state.pageSize);
-                var card = document.querySelector('.order-table-card');
-                if (card) {
-                    card.outerHTML = html.match(/<div class="card order-table-card">[\s\S]*<\/div>\s*<div id="orderTablePaginator"><\/div>/)?.[0] || card.outerHTML;
-                }
                 var newHtmlDiv = document.createElement('div');
                 newHtmlDiv.innerHTML = html;
                 var newCard = newHtmlDiv.querySelector('.order-table-card');
@@ -314,7 +310,6 @@
                 if (isOverdue) displayStatus = 'overdue';
                 var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
                 var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
-                var nextDueDate = o.next_interest_due_date ? Utils.formatDate(o.next_interest_due_date) : '-';
                 var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
                 var startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
                 var interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
@@ -754,7 +749,7 @@
                     for (var idx = 0; idx < allPayments.length; idx++) {
                         var p2 = allPayments[idx];
                         var methodClass = p2.payment_method === 'cash' ? 'cash' : 'bank';
-                        rows += '<td>' +
+                        rows += '<tr>' +
                             '<td class="order-id">' + Utils.escapeHtml(p2.orders ? p2.orders.order_id : '-') + '</td>' +
                             '<td>' + Utils.escapeHtml(p2.orders ? p2.orders.customer_name : '-') + '</td>' +
                             '<td class="date-cell">' + Utils.formatDate(p2.date) + '</td>' +
@@ -905,36 +900,6 @@
             }
 
             var repaymentInfoHtml = ''; // 将在 interestCount 计算完后赋值
-            // 修复：利息历史表格 5 列，使用 t('times') 等翻译键
-            var payRows = '';
-            if (payments && payments.length > 0) {
-                for (var i = 0; i < payments.length; i++) {
-                    var p = payments[i];
-                    var typeText = p.type === 'admin_fee' ? t('admin_fee') : p.type === 'service_fee' ? t('service_fee') : p.type === 'interest' ? t('interest') : t('principal');
-                    var methodClass = p.payment_method === 'cash' ? 'cash' : 'bank';
-                    // 利息表格单独处理，保持 5 列；本金表格可沿用原 6 列（但此处统一简化）
-                    if (p.type === 'interest') {
-                        payRows += '<td>' +
-                            '<td class="text-center">' + (i + 1) + '</td>' +
-                            '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
-                            '<td class="text-center">' + (p.months || 1) + ' ' + t('month') + '</td>' +
-                            '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                            '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
-                            '</tr>';
-                    } else {
-                        payRows += '<tr>' +
-                            '<td class="date-cell">' + Utils.formatDate(p.date) + '</td>' +
-                            '<td>' + typeText + '</td>' +
-                            '<td class="text-center">' + (p.months ? p.months + ' ' + t('month') : '-') + '</td>' +
-                            '<td class="amount">' + Utils.formatCurrency(p.amount) + '</td>' +
-                            '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p.payment_method] || '-') + '</span></td>' +
-                            '<td class="desc-cell">' + Utils.escapeHtml(p.description || '-') + '</td>' +
-                            '</tr>';
-                    }
-                }
-            } else {
-                payRows = '<tr><td colspan="6" class="text-center">' + t('no_data') + '</td></tr>';
-            }
             // 分离利息和本金表格展示，便于阅读
             var interestRows = '', principalRows = '';
             var interestCount = 0, principalCount = 0;
@@ -957,7 +922,7 @@
                         '<td class="date-cell">' + Utils.formatDate(pj.date) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(pj.amount) + '</td>' +
                         '<td class="text-center"><span class="badge badge--' + methodClassPr + '">' + (methodMap[pj.payment_method] || '-') + '</span></td>' +
-                        '<tr>';
+                        '</tr>';
                 }
             }
             if (interestRows === '') interestRows = '<td><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
@@ -1260,7 +1225,7 @@
                 _nextTmpId = -1;
 
                 var today = Utils.getLocalToday();
-                var orderDate = (order.created_at || '').substring(0, 10) || today;
+                var orderDateStr = order.custom_order_date || (order.created_at || '').substring(0, 10) || today;
                 var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
 
                 var paymentEditorHtml = this._renderPaymentEditor(lang);
@@ -1280,7 +1245,7 @@
                     '<div class="form-section-title"><span class="section-icon">📋</span> ' + (lang === 'id' ? '基本信息' : '基本信息') + '</div>' +
                     '<div class="form-grid">' +
                     '<div class="form-group"><label>' + (lang === 'id' ? '订单日期' : '订单日期') + '</label>' +
-                    '<input type="date" id="edit_order_date" value="' + orderDate + '" max="' + today + '"></div>' +
+                    '<input type="date" id="edit_order_date" value="' + orderDateStr + '" max="' + today + '"></div>' +
                     '<div class="form-group"><label>' + t('collateral_name') + '</label>' +
                     '<input type="text" id="edit_collateral" value="' + Utils.escapeHtml(order.collateral_name || '') + '"></div>' +
                     '<div class="form-group"><label>' + t('loan_amount') + '</label>' +
