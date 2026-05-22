@@ -21,12 +21,10 @@
     width: calc(100% + 32px);
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
-    grid-template-rows: var(--topbar-height) 1fr;
-    grid-template-areas:
-        "sidebar topbar"
-        "sidebar main";
-    height: 100vh;          /* 严格固定，不用 min/max */
-    overflow: hidden;       /* 防止任何子元素撑破 */
+    grid-template-rows: 1fr;           /* 桌面端隐藏 topbar，只有一行 */
+    grid-template-areas: "sidebar main";
+    height: 100vh;
+    overflow: hidden;
     background: #f5f6fa;
     font-family: var(--font-sans);
   }
@@ -201,11 +199,8 @@
 
 
 
-  /* 顶部栏 */
-  .dash-topbar {
-    grid-area: topbar;
-    background: var(--white);
-    border-bottom: 1px solid #dde3ec;
+  /* 顶部栏：手机端显示，桌面端隐藏（侧边栏已有相同信息） */
+  .dash-topbar { display: none; }
     padding: 10px 20px;
     height: var(--topbar-height);
     display: flex;
@@ -635,7 +630,14 @@
     }
     /* 手机端恢复 body 可滚动（侧边栏是 fixed overlay，不占位） */
     html, body { height: auto; overflow: auto; }
-    .dashboard-v2 { height: auto; min-height: 100vh; overflow: visible; }
+    .dashboard-v2 {
+      height: auto; min-height: 100vh; overflow: visible;
+      grid-template-columns: 1fr;
+      grid-template-rows: var(--topbar-height) 1fr;
+      grid-template-areas: "topbar" "main";
+    }
+    /* 手机端显示 topbar */
+    .dash-topbar { display: flex; }
     .dash-main {
       padding: 14px 12px;
       margin-top: 0;
