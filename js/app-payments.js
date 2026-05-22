@@ -212,7 +212,7 @@
                     }
                     lastInterestDate = interestPayments[interestPayments.length - 1]?.date?.substring(0, 10) || '';
                 }
-                const orderCreatedDate = (order.created_at || '').substring(0, 10);
+                const orderCreatedDate = order.custom_order_date || (order.created_at || '').substring(0, 10);
                 const interestDateMin = orderCreatedDate;
                 const interestDateToday = Utils.getLocalToday();
                 const principalDateMin = orderCreatedDate;

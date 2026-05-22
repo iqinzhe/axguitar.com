@@ -740,7 +740,7 @@
                                 else detailsText = Utils.escapeHtml(log.details || '').substring(0, 80);
                             }
                         } catch (e) { detailsText = Utils.escapeHtml(String(log.details || '')).substring(0, 80); }
-                        rows += `<td><td class="date-cell">${Utils.formatDate(log.created_at)}</td><td>${actionText}</td><td>${Utils.escapeHtml(log.user_name || '-')}</td><td class="desc-cell">${detailsText}</td></tr>`;
+                        rows += `<tr><td class="date-cell">${Utils.formatDate(log.created_at)}</td><td>${actionText}</td><td>${Utils.escapeHtml(log.user_name || '-')}</td><td class="desc-cell">${detailsText}</td></tr>`;
                     }
                 }
 

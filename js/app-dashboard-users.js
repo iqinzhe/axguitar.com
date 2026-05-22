@@ -385,7 +385,7 @@
                                 console.warn('[resetUserPassword] 撤销用户 session 失败:', signOutError.message);
                                 // 非致命错误，不阻断流程
                             } else {
-                                console.log('[resetUserPassword] 已撤销用户 session:', userId);
+                                console.info('[resetUserPassword] 已撤销用户 session:', userId);
                             }
                         } catch (logoutError) {
                             console.warn('[resetUserPassword] 撤销 session 异常:', logoutError.message);
