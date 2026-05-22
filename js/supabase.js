@@ -1418,6 +1418,8 @@
                     next_interest_due_date: nextDue,
                     monthly_interest: remainPrincipal * monthlyRate,
                     fund_status: 'extended',
+                    overdue_days: 0,              // 修复：还款后立即清零逾期天数
+                    liquidation_status: 'normal', // 修复：还款后恢复正常状态
                     updated_at: nowStr()
                 };
                 if(principalAdjustment>0){
@@ -1581,6 +1583,8 @@
                 interest_paid_months: (order.interest_paid_months||0) + 1,
                 interest_paid_total: (order.interest_paid_total||0) + interestAmt,
                 next_interest_due_date: this.calculateNextDueDate(orderDate(order), newFixedPaid),
+                overdue_days: 0,              // 修复：还款后立即清零逾期天数
+                liquidation_status: 'normal', // 修复：还款后恢复正常状态
                 updated_at: nowStr()
             };
             if(isCompleted){ updates.status='completed'; updates.fund_status='returned'; updates.completed_at=nowStr(); }
