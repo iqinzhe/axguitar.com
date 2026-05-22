@@ -167,20 +167,20 @@
                 
                 let rows = '';
                 if (messages.length === 0) {
-                    rows = `<tr><td colspan="5" class="text-center">✅ ${lang === 'id' ? 'Tidak ada pesan tertunda' : '暂无待发送消息'}<\/td>`;
+                    rows = `<tr><td colspan="5" class="text-center">✅ ${lang === 'id' ? 'Tidak ada pesan tertunda' : '暂无待发送消息'}</td></tr>`;
                 } else {
                     for (let i = 0; i < messages.length; i++) {
                         const m = messages[i];
                         rows += `<tr>
-                            <td class="text-center" style="width:40px;">${i + 1}<\/td>
-                            <td class="order-id">${Utils.escapeHtml(m.orderId)}<\/td>
-                            <td class="col-name">${Utils.escapeHtml(m.customerName)}<\/td>
-                            <td class="col-status">${m.typeLabel}<\/td>
+                            <td class="text-center" style="width:40px;">${i + 1}</td>
+                            <td class="order-id">${Utils.escapeHtml(m.orderId)}</td>
+                            <td class="col-name">${Utils.escapeHtml(m.customerName)}</td>
+                            <td class="col-status">${m.typeLabel}</td>
                             <td class="text-center" style="white-space:nowrap;">
-                                <button onclick="MessageCenter.copyToClipboard('${Utils.escapeAttr(m.waMessage)}', '${Utils.escapeAttr(m.orderId)}')" class="btn btn--sm btn--primary">📋 ${lang === 'id' ? 'Salin Pesan' : '复制消息'}<\/button>
-                                <button onclick="MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success">✅ ${lang === 'id' ? 'Tandai Terkirim' : '标记已发送'}<\/button>
-                                <button onclick="MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning">📱 ${lang === 'id' ? 'Buka WA' : '打开WA'}<\/button>
-                            <\/td>
+                                <button onclick="MessageCenter.copyToClipboard('${Utils.escapeAttr(m.waMessage)}', '${Utils.escapeAttr(m.orderId)}')" class="btn btn--sm btn--primary">📋 ${lang === 'id' ? 'Salin Pesan' : '复制消息'}</button>
+                                <button onclick="MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success">✅ ${lang === 'id' ? 'Tandai Terkirim' : '标记已发送'}</button>
+                                <button onclick="MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning">📱 ${lang === 'id' ? 'Buka WA' : '打开WA'}</button>
+                            </td>
                         </tr>`;
                     }
                 }
@@ -323,6 +323,52 @@
 
     // 挂载到命名空间
     JF.MessageCenter = MessageCenter;
+
+    // ===== 自动提醒定时器：登录后每10分钟检查一次到期提醒 =====
+    let _reminderTimer = null;
+
+    MessageCenter.startReminderTimer = function() {
+        if (_reminderTimer) clearInterval(_reminderTimer);
+        const CHECK_INTERVAL = 10 * 60 * 1000; // 10分钟
+
+        const check = async () => {
+            try {
+                const messages = await MessageCenter.getPendingMessages();
+                const count = messages.length;
+                // 更新侧边栏消息中心徽章
+                const navItem = document.querySelector('.nav-item[onclick*="messageCenter"]');
+                if (navItem) {
+                    let badge = navItem.querySelector('.nav-badge');
+                    if (count > 0) {
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'nav-badge';
+                            navItem.appendChild(badge);
+                        }
+                        badge.textContent = count;
+                        badge.style.cssText = 'background:#ef4444;color:#fff;font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;margin-left:6px;';
+                    } else if (badge) {
+                        badge.remove();
+                    }
+                }
+                // 仪表盘消息中心卡片预览也一并刷新
+                const previewEl = document.querySelector('.message-preview');
+                if (previewEl && count > 0 && window.JF?.DashboardCore?._updateMessagePreview) {
+                    JF.DashboardCore._updateMessagePreview(messages);
+                }
+            } catch (e) {
+                // 静默失败，不打扰用户
+            }
+        };
+
+        // 立即执行一次，之后每10分钟执行
+        check();
+        _reminderTimer = setInterval(check, CHECK_INTERVAL);
+    };
+
+    MessageCenter.stopReminderTimer = function() {
+        if (_reminderTimer) { clearInterval(_reminderTimer); _reminderTimer = null; }
+    };
     
     // 挂载到 APP
     if (window.APP) {

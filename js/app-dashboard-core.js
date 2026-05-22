@@ -1011,6 +1011,8 @@
                 const user = await AUTH.login(username, password);
                 if (!user) { if (errorDiv) { errorDiv.style.display = 'flex'; errorMsg.textContent = Utils.lang === 'id' ? 'Login gagal. Periksa kembali email/username dan password Anda.' : '登录失败，请检查邮箱/用户名和密码。'; } if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); } return; }
                 this.clearPageState(); this._isInitialized = true; this._startOverdueInterval();
+                // 启动 WA 提醒定时器（每10分钟自动检查到期提醒）
+                if (JF.MessageCenter?.startReminderTimer) JF.MessageCenter.startReminderTimer();
                 await this.renderDashboard();
             } catch (error) { console.error('[DashboardCore] 登录异常:', error); const errorDiv = document.getElementById("loginError"); if (errorDiv) { errorDiv.style.display = 'flex'; errorDiv.querySelector('#loginErrorMessage').textContent = error.message || Utils.t('login_failed'); } }
             finally { this._loginLock = false; const btn = document.getElementById("loginBtn"); if (btn) { btn.disabled = false; btn.textContent = Utils.t('login'); } }
@@ -1018,6 +1020,8 @@
 
         async logout() {
             this._clearOverdueInterval(); this._clearIdleTimer();
+            // 停止 WA 提醒定时器
+            if (JF.MessageCenter?.stopReminderTimer) JF.MessageCenter.stopReminderTimer();
             if (Utils.NetworkMonitor?.destroy) Utils.NetworkMonitor.destroy();
             const confirmed = await Utils.toast.confirm(Utils.t('save_exit_confirm'));
             if (!confirmed) return;
