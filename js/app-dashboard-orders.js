@@ -574,6 +574,9 @@
             if (!tbody) return;
             var existingRow = document.getElementById('loadMoreRow');
             if (existingRow) existingRow.remove();
+            // 有分页器时不显示"加载更多"行，避免两套系统冲突
+            var paginator = document.getElementById('orderTablePaginator');
+            if (paginator && paginator.innerHTML.trim()) return;
             var lang = Utils.lang;
             if (state.currentFrom < state.totalCount) {
                 var remaining = state.totalCount - state.currentFrom;

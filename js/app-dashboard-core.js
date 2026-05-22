@@ -862,14 +862,6 @@
                             <div class="fund-block fund-block--deployed"><div class="fund-block-label">${lang === 'id' ? 'Dalam Gadai' : '在押资金'}</div><div class="fund-block-val">${Utils.formatCurrency(deployed)}</div><div class="fund-block-sub">${activeOrders} ${lang === 'id' ? 'pesanan aktif' : '笔活跃订单'}</div></div>
                             <div class="fund-block fund-block--free"><div class="fund-block-label">${lang === 'id' ? 'Dana Tersedia' : '可动用资金'}</div><div class="fund-block-val">${Utils.formatCurrency(available)}</div><div class="fund-block-sub">${lang === 'id' ? 'Kas + Bank' : '现金 + 银行'}</div></div>
                         </div>
-                        <div class="util-bar-wrap">
-                            <div class="util-bar-label"><span>${lang === 'id' ? 'Tingkat Utilisasi Modal' : '资金利用率'}</span><span class="util-bar-pct">${utilizationRate}%</span></div>
-                            <div class="util-bar-track"><div class="util-bar-fill" style="width:${Math.min(utilizationRate, 100)}%;"></div></div>
-                            <div class="util-bar-hint">
-                                <span>${lang === 'id' ? 'Ideal: 70–90%' : '建议区间：70–90%'}</span>
-                                <span class="util-bar-hint-status ${utilizationRate < 30 || utilizationRate > 90 ? 'warn' : 'ok'}">${utilizationRate < 30 ? (lang === 'id' ? '⚠️ Utilisasi rendah' : '⚠️ 利用率偏低') : utilizationRate > 90 ? (lang === 'id' ? '⚠️ Terlalu tinggi' : '⚠️ 利用率偏高') : (lang === 'id' ? '✅ Normal' : '✅ 正常')}</span>
-                            </div>
-                        </div>
                         <div class="fund-stat-row">
                             <div class="fund-stat-item">
                                 <div class="fund-stat-icon">📥</div>
