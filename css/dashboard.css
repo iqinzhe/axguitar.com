@@ -143,6 +143,8 @@
     padding: clamp(3px, 0.6vh, 5px) 15px;
     border-top: 1px solid rgba(14, 116, 144, 0.2);
     flex-shrink: 0;
+    z-index: 2;           /* 确保不被遮挡 */
+    background: var(--gradient-sidebar); /* 防止透视 */
   }
   .lang-toggle {
     display: flex; flex-direction: column; align-items: stretch;
@@ -647,9 +649,13 @@
       z-index: calc(var(--z-sidebar) + 1);
       transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      overflow-y: auto;
+      overflow: hidden;              /* 整体不滚动 */
+      display: flex; flex-direction: column;
       box-shadow: 2px 0 12px rgba(0,0,0,0.15);
     }
+    /* 手机端菜单区可滚动，footer 固定底部 */
+    .dash-sidebar .sidebar-nav { overflow-y: auto; flex: 1; min-height: 0; }
+    .dash-sidebar .sidebar-footer { flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom, 8px); }
     .dash-sidebar.open { transform: translateX(0); }
     .sidebar-overlay {
       position: fixed; top: 0; left: 0; right: 0; bottom: 0;
