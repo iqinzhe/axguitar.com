@@ -890,8 +890,6 @@
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('anomaly')"><span class="nav-icon">⚠️</span> ${t('anomaly_title')}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('storeFinance')"><span class="nav-icon">📊</span> ${lang === 'id' ? 'Ringkasan Keuangan' : '财务汇总'}</div>
                     <div class="nav-item" onclick="JF.DashboardCore.navigateTo('backupRestore')"><span class="nav-icon">📦</span> ${t('backup_restore')}</div>`}
-                    <div style="flex:1;"></div>
-                    <div class="nav-item danger" onclick="JF.DashboardCore.logout()"><span class="nav-icon">🚪</span> ${t('save_exit')}</div>
                 </div>`;
 
                 const finalHtml = `
@@ -901,7 +899,7 @@
                 <div class="sidebar-logo"><div class="logo-mark"><div class="logo-icon">JF</div><div><div class="logo-text">JF! by Gadai</div><div class="logo-sub">${lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统'}</div></div></div></div>
                 <div class="sidebar-user"><div class="user-av">${userInitial}</div><div class="user-info"><div class="user-name-top">${Utils.escapeHtml(profile?.name || 'User')}</div><div class="user-detail-row"><span class="user-role">${userRoleText}</span><span class="user-store-badge">${storeDisplay}</span></div></div></div>
                 ${sidebarMenuHtml}
-                <div class="sidebar-footer"><div class="lang-toggle"><div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('zh')">中文</div><div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('id')">Bahasa</div></div><div onclick="JF.DashboardCore.invalidateDashboardCache()" style="text-align:center;margin-top:4px;padding:2px;cursor:pointer;font-size:0.7rem;color:var(--gray-500);border-radius:5px;transition:background 0.15s;" onmouseover="this.style.background='rgba(14,116,144,0.1)'" onmouseout="this.style.background=''" title="${lang === 'id' ? 'Perbarui data' : '刷新数据'}">🔄 ${lang === 'id' ? 'Perbarui' : '刷新数据'}</div></div>
+                <div class="sidebar-footer"><div class="nav-item danger" onclick="JF.DashboardCore.logout()" style="margin-bottom:4px;border-radius:6px;"><span class="nav-icon">🚪</span> ${t('save_exit')}</div><div class="lang-toggle"><div class="lang-btn-side${Utils.lang === 'zh' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('zh')">中文</div><div class="lang-btn-side${Utils.lang === 'id' ? ' active-lang' : ''}" onclick="JF.DashboardCore._setLang('id')">Bahasa</div></div><div onclick="JF.DashboardCore.invalidateDashboardCache()" style="text-align:center;margin-top:4px;padding:2px;cursor:pointer;font-size:0.7rem;color:var(--gray-500);border-radius:5px;transition:background 0.15s;" onmouseover="this.style.background='rgba(14,116,144,0.1)'" onmouseout="this.style.background=''" title="${lang === 'id' ? 'Perbarui data' : '刷新数据'}">🔄 ${lang === 'id' ? 'Perbarui' : '刷新数据'}</div></div>
             </div>
             <div class="dash-topbar">
                 <div class="topbar-left"><div class="btn btn--outline" id="hamburgerBtn" onclick="JF.DashboardCore._toggleSidebar()">☰</div><div><div class="topbar-title">${lang === 'id' ? 'Dasbor' : '仪表盘总览'}</div><div class="topbar-sub">${topbarSubtitle}</div></div></div>
