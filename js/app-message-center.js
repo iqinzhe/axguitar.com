@@ -89,43 +89,56 @@
             const storeWA = await SUPABASE.getStoreWANumber(storeId);
             
             for (const order of orders || []) {
-                // 1. 到期前 2 天提醒
                 const dueDate = order.next_interest_due_date;
+                const overdueDays = order.overdue_days || 0;
+
+                // 计算距到期天数（负数=已逾期）
+                let daysUntilDue = null;
                 if (dueDate) {
                     const due = new Date(dueDate);
                     due.setHours(0, 0, 0, 0);
-                    const daysUntilDue = Math.ceil((due - today) / 86400000);
-                    
-                    if (daysUntilDue === 2 && !this._isSentToday(order.id, 'upcoming')) {
-                        const waMessage = JF.WAPage.generateWAText(order, storeWA);
+                    daysUntilDue = Math.ceil((due - today) / 86400000);
+                }
+
+                // 1. 逾期提醒（优先级最高）
+                if (overdueDays > 0) {
+                    // 逾期每天都提醒，用 overdue_days 作为 key 防止同逾期天数重复
+                    const sentKey = `overdue_${overdueDays}`;
+                    if (!this._isSentToday(order.id, sentKey)) {
+                        const waMessage = JF.WAPage.generateWAText(order, storeWA, 'overdue');
                         messages.push({
                             orderId: order.order_id,
-                            type: 'upcoming',
-                            typeLabel: lang === 'id' ? '🔔 Segera Jatuh Tempo (2 hari lagi)' : '🔔 即将到期 (2天后)',
+                            type: 'overdue',
+                            typeLabel: lang === 'id' ? `⚠️ Terlambat ${overdueDays} hari` : `⚠️ 已逾期 ${overdueDays} 天`,
                             customerName: order.customer_name,
                             customerPhone: order.customer_phone,
-                            dueDate: Utils.formatDate(dueDate),
+                            overdueDays: overdueDays,
+                            dueDate: dueDate ? Utils.formatDate(dueDate) : '-',
                             waMessage: waMessage,
-                            overdueDays: 0
+                            amount: this._getPaymentAmount(order)
                         });
                     }
                 }
-                
-                // 2. 逾期提醒
-                const overdueDays = order.overdue_days || 0;
-                if (overdueDays > 0 && !this._isSentToday(order.id, `overdue_${overdueDays}`)) {
-                    const waMessage = JF.WAPage.generateWAText(order, storeWA);
-                    messages.push({
-                        orderId: order.order_id,
-                        type: 'overdue',
-                        typeLabel: lang === 'id' ? `⚠️ Terlambat ${overdueDays} hari` : `⚠️ 逾期 ${overdueDays} 天`,
-                        customerName: order.customer_name,
-                        customerPhone: order.customer_phone,
-                        overdueDays: overdueDays,
-                        dueDate: order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-',
-                        waMessage: waMessage,
-                        amount: this._getPaymentAmount(order)
-                    });
+                // 2. 到期前 1~3 天提醒（非逾期订单）
+                else if (daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3) {
+                    if (!this._isSentToday(order.id, 'upcoming')) {
+                        const dayLabel = daysUntilDue === 0
+                            ? (lang === 'id' ? '⏰ Jatuh Tempo Hari Ini' : '⏰ 今天到期')
+                            : (lang === 'id' ? `🔔 Jatuh Tempo ${daysUntilDue} Hari Lagi` : `🔔 ${daysUntilDue} 天后到期`);
+                        const waMessage = JF.WAPage.generateWAText(order, storeWA, 'upcoming');
+                        messages.push({
+                            orderId: order.order_id,
+                            type: 'upcoming',
+                            typeLabel: dayLabel,
+                            customerName: order.customer_name,
+                            customerPhone: order.customer_phone,
+                            dueDate: dueDate ? Utils.formatDate(dueDate) : '-',
+                            waMessage: waMessage,
+                            overdueDays: 0,
+                            daysUntilDue: daysUntilDue,
+                            amount: this._getPaymentAmount(order)
+                        });
+                    }
                 }
             }
             
@@ -171,15 +184,19 @@
                 } else {
                     for (let i = 0; i < messages.length; i++) {
                         const m = messages[i];
-                        rows += `<tr>
-                            <td class="text-center" style="width:40px;">${i + 1}</td>
+                        const amountStr = m.amount ? Utils.formatCurrency(m.amount) : '-';
+                        const rowCls = m.type === 'overdue' ? 'style="background:#fff7f7;"' : '';
+                        rows += `<tr ${rowCls}>
+                            <td class="text-center" style="width:30px;">${i + 1}</td>
                             <td class="order-id">${Utils.escapeHtml(m.orderId)}</td>
                             <td class="col-name">${Utils.escapeHtml(m.customerName)}</td>
-                            <td class="col-status">${m.typeLabel}</td>
+                            <td class="text-center">${m.typeLabel}</td>
+                            <td class="amount">${amountStr}</td>
+                            <td class="date-cell text-center">${m.dueDate}</td>
                             <td class="text-center" style="white-space:nowrap;">
-                                <button onclick="MessageCenter.copyToClipboard('${Utils.escapeAttr(m.waMessage)}', '${Utils.escapeAttr(m.orderId)}')" class="btn btn--sm btn--primary">📋 ${lang === 'id' ? 'Salin Pesan' : '复制消息'}</button>
-                                <button onclick="MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success">✅ ${lang === 'id' ? 'Tandai Terkirim' : '标记已发送'}</button>
-                                <button onclick="MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning">📱 ${lang === 'id' ? 'Buka WA' : '打开WA'}</button>
+                                <button onclick="JF.MessageCenter.openWhatsApp('${Utils.escapeAttr(m.customerPhone)}', '${Utils.escapeAttr(m.waMessage)}')" class="btn btn--sm btn--warning" title="${lang === 'id' ? 'Buka & kirim langsung' : '直接发送'}">📱 WA</button>
+                                <button onclick="JF.MessageCenter.copyToClipboard('${Utils.escapeAttr(m.waMessage)}', '${Utils.escapeAttr(m.orderId)}')" class="btn btn--sm btn--primary" title="${lang === 'id' ? 'Salin teks pesan' : '复制消息文本'}">📋</button>
+                                <button onclick="JF.MessageCenter.markAsSentAndRemove('${Utils.escapeAttr(m.orderId)}', '${m.type}')" class="btn btn--sm btn--success" title="${lang === 'id' ? 'Tandai sudah dikirim' : '标记已发送'}">✅</button>
                             </td>
                         </tr>`;
                     }
@@ -224,10 +241,12 @@
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th class="text-center" style="width:40px;">#</th>
+                                        <th class="text-center" style="width:30px;">#</th>
                                         <th class="col-id">${t('order_id')}</th>
                                         <th class="col-name">${t('customer_name')}</th>
-                                        <th class="col-status">${lang === 'id' ? 'Jenis Pengingat' : '提醒类型'}</th>
+                                        <th class="text-center">${lang === 'id' ? 'Status' : '提醒类型'}</th>
+                                        <th class="amount">${lang === 'id' ? 'Jumlah' : '应还金额'}</th>
+                                        <th class="date-cell text-center">${lang === 'id' ? 'Jatuh Tempo' : '还款日'}</th>
                                         <th class="text-center">${lang === 'id' ? 'Aksi' : '操作'}</th>
                                     </tr>
                                 </thead>
