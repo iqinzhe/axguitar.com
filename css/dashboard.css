@@ -299,50 +299,79 @@
   }
 
   /* 工作日历 */
+  /* ===== 日历样式 ===== */
   .work-calendar { width: 100%; font-size: 10px; }
-  .calendar-header { text-align: center; font-weight: 700; font-size: 12px; margin-bottom: 4px; color: var(--text-primary); }
-  .cal-table { width: 100%; text-align: center; border-collapse: collapse; }
-  .cal-table th, .cal-table td { padding: 1px 0; font-weight: normal; color: var(--text-secondary); border: none; }
-  .cal-cell { position: relative; }
-  .cal-date { display: block; font-size: 11px; color: var(--text-primary); }
-  .cal-today { font-weight: 700; color: var(--primary) !important; text-decoration: underline; }
-  .cal-cell.is-today { background: rgba(14,116,144,0.07); border-radius: 4px; }
-  .cal-cell.is-overdue { background: rgba(239,68,68,0.08); border-radius: 4px; }
-  .cal-due-count {
-    display: inline-block;
-    background: var(--red-500);
-    color: var(--white);
-    border-radius: 10px;
-    padding: 0 4px;
-    font-size: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 1px;
-    transition: background 0.2s;
-    line-height: 1.4;
+  .calendar-header {
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 700; font-size: 12px; margin-bottom: 6px; color: var(--text-primary);
   }
-  .cal-due-count:hover { background: var(--red-600); }
-  /* 今天到期：橙色徽章 */
-  .cal-cell.is-today .cal-due-count { background: var(--amber-500); }
-  /* 逾期（已过日期）：深红徽章 */
-  .cal-due-count.cal-overdue { background: #991b1b; }
-  .cal-due-count.cal-overdue:hover { background: #7f1d1d; }
+  .cal-legend { display: flex; gap: 8px; align-items: center; }
+  .cal-legend-item { display: flex; align-items: center; gap: 2px; font-size: 9px; color: var(--text-muted); }
 
-  .cal-popup {
-    background: var(--white);
-    border: 1px solid var(--gray-300);
-    border-radius: 10px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-    padding: 12px;
-    max-width: 260px;
-    font-size: 12px;
-    z-index: var(--z-tooltip);
+  .cal-table { width: 100%; text-align: center; border-collapse: collapse; }
+  .cal-table th { padding: 2px 0; font-weight: 600; color: var(--text-secondary); font-size: 10px; }
+  .cal-table td { padding: 1px; border: none; }
+  .cal-cell { position: relative; border-radius: 4px; transition: background 0.15s; cursor: default; }
+  .cal-cell.has-due { cursor: pointer; }
+  .cal-cell.has-due:hover { filter: brightness(0.93); }
+  .cal-empty { background: none !important; }
+  .cal-cell.is-today { outline: 2px solid var(--primary); outline-offset: -1px; border-radius: 4px; }
+  .cal-cell.cal-rest { background: rgba(22,163,74,0.07); }  /* 未来无业务=浅绿 */
+
+  .cal-date { display: block; font-size: 11px; color: var(--text-primary); line-height: 1.4; }
+  .cal-today { font-weight: 700; color: var(--primary) !important; }
+
+  /* 双色徽章 */
+  .cal-badge {
+    display: inline-block; border-radius: 8px; padding: 0 3px;
+    font-size: 9px; font-weight: 600; line-height: 1.5;
+    cursor: pointer; margin: 0 1px;
   }
-  .cal-popup-title { font-weight: 600; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--gray-200); }
-  .cal-popup ul { list-style: none; padding: 0; margin: 0; }
-  .cal-popup li { margin: 5px 0; }
-  .cal-popup a { color: var(--primary); text-decoration: none; display: block; padding: 2px 0; }
-  .cal-popup a:hover { color: var(--primary-dark); text-decoration: underline; }
+  .cal-badge--due { background: #fee2e2; color: #b91c1c; }
+  .cal-badge--due.cal-overdue { background: #991b1b; color: #fff; }
+  .cal-badge--new { background: #dbeafe; color: #1d4ed8; }
+  .cal-badge--due:hover { background: #fca5a5; }
+  .cal-badge--new:hover { background: #bfdbfe; }
+
+  /* 可休息标记 */
+  .cal-rest-dot { display: block; font-size: 6px; color: #16a34a; line-height: 1; margin-top: 1px; }
+
+  /* 弹出卡片 */
+  .cal-popup {
+    background: var(--white); border: 1px solid var(--gray-200);
+    border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    width: 280px; font-size: 12px; overflow: hidden;
+  }
+  .cal-popup-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: var(--bg-hover);
+    border-bottom: 1px solid var(--gray-200);
+    font-weight: 700; font-size: 13px; color: var(--text-primary);
+  }
+  .cal-popup-close {
+    cursor: pointer; color: var(--text-muted); font-size: 14px;
+    padding: 0 4px; border-radius: 4px; line-height: 1;
+  }
+  .cal-popup-close:hover { background: var(--gray-200); color: var(--text-primary); }
+  .cal-popup-body { max-height: 320px; overflow-y: auto; padding: 8px; }
+  .cal-popup-section-title {
+    font-size: 10px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 4px 6px 2px; margin-top: 4px;
+  }
+  .cal-popup-card {
+    background: var(--bg-hover); border-radius: 8px; padding: 8px 10px;
+    margin: 4px 0; cursor: pointer; border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .cal-popup-card:hover { background: #e0f2fe; border-color: #7dd3fc; }
+  .cal-popup-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+  .cal-popup-order { font-weight: 700; color: var(--primary); font-size: 11px; }
+  .cal-popup-badge { font-size: 9px; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+  .cal-popup-badge--due { background: #fee2e2; color: #b91c1c; }
+  .cal-popup-badge--new { background: #dbeafe; color: #1d4ed8; }
+  .cal-popup-card-name { font-size: 12px; color: var(--text-primary); font-weight: 500; }
+  .cal-popup-card-amount { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
   /* 中间行 */
   .mid-row { display: grid; grid-template-columns: 1fr 280px; gap: 10px; align-items: stretch; }
