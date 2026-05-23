@@ -61,14 +61,15 @@
     let _overdueInterval = null;
 
     // ========== 工作日历构建函数 ==========
-    function buildWorkCalendarHTML(dueOrders, lang, dueMap) {
+    function buildWorkCalendarHTML(dueOrders, lang, dueMap, newMap) {
         const today = Utils.getJakartaDate();
         const year = today.getUTCFullYear();
         const month = today.getUTCMonth();
+        const todayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(today.getUTCDate()).padStart(2,'0')}`;
 
         const monthNames = lang === 'id'
             ? ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
-            : ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            : ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
 
         const weekDays = lang === 'id'
             ? ['Sen','Sel','Rab','Kam','Jum','Sab','Min']
@@ -78,46 +79,62 @@
         const firstDay = new Date(Date.UTC(year, month, 1)).getUTCDay();
         const startIndex = (firstDay + 6) % 7;
 
-        if (!dueMap) {
-            dueMap = {};
-            dueOrders.forEach(o => {
-                const d = o.next_interest_due_date;
-                if (!d) return;
-                if (!dueMap[d]) dueMap[d] = [];
-                dueMap[d].push(o);
-            });
-        }
+        if (!dueMap) { dueMap = {}; dueOrders.forEach(o => { const d = o.next_interest_due_date; if (!d) return; if (!dueMap[d]) dueMap[d] = []; dueMap[d].push(o); }); }
+        if (!newMap) newMap = {};
+
+        // 热力图：用业务总量决定颜色深度
+        const heatColor = (total) => {
+            if (total === 0) return '';
+            if (total === 1) return '#e0f2fe';
+            if (total === 2) return '#bae6fd';
+            if (total <= 4) return '#38bdf8';
+            return '#0284c7';
+        };
 
         let tableRows = '<tr>';
-        for (let i = 0; i < 7; i++) {
-            tableRows += `<th>${weekDays[i]}</th>`;
-        }
+        for (let i = 0; i < 7; i++) tableRows += `<th>${weekDays[i]}</th>`;
         tableRows += '</tr>';
 
         let day = 1;
         for (let r = 0; r < 6; r++) {
             let row = '<tr>';
             for (let c = 0; c < 7; c++) {
-                if (r === 0 && c < startIndex) {
-                    row += '<td></td>';
-                    continue;
-                }
-                if (day > totalDays) {
-                    row += '<td></td>';
-                    continue;
-                }
+                if (r === 0 && c < startIndex) { row += '<td class="cal-cell cal-empty"></td>'; continue; }
+                if (day > totalDays) { row += '<td class="cal-cell cal-empty"></td>'; continue; }
+
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-                const todayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(today.getUTCDate()).padStart(2,'0')}`;
-                const ordersOnDay = dueMap[dateStr] || [];
-                const count = ordersOnDay.length;
-                const isToday = dateStr === todayStr;
-                const isPast = count > 0 && dateStr < todayStr;
-                let cellContent = `<span class="cal-date${isToday?' cal-today':''}">${day}</span>`;
-                if (count > 0) {
-                    const dotClass = isPast ? 'cal-due-count cal-overdue' : 'cal-due-count';
-                    cellContent += `<span class="${dotClass}" data-date="${dateStr}" title="${count} ${lang==='id'?'pesanan':'orders'}">${count}</span>`;
+                const duePending = dueMap[dateStr] || [];   // 当日到期还款
+                const newSigned  = newMap[dateStr]  || [];  // 当日新签订单
+                const dueCount   = duePending.length;
+                const newCount   = newSigned.length;
+                const total      = dueCount + newCount;
+                const isToday    = dateStr === todayStr;
+                const isPast     = dateStr < todayStr;
+                const isRestDay  = total === 0 && !isToday; // 无业务日
+
+                // 背景热力色
+                const bgColor = isRestDay && isPast ? '' : heatColor(total);
+                const bgStyle = bgColor ? ` style="background:${bgColor};"` : '';
+
+                let cellCls = 'cal-cell';
+                if (isToday) cellCls += ' is-today';
+                if (isRestDay && !isPast) cellCls += ' cal-rest';  // 未来无业务=浅绿
+                if (total > 0) cellCls += ' has-due';
+
+                let cellContent = `<span class="cal-date${isToday ? ' cal-today' : ''}">${day}</span>`;
+
+                if (dueCount > 0) {
+                    const cls = isPast ? 'cal-badge cal-badge--due cal-overdue' : 'cal-badge cal-badge--due';
+                    cellContent += `<span class="${cls}" data-date="${dateStr}" data-type="due" title="${lang==='id'?'Jatuh tempo':'到期还款'}: ${dueCount}">💰${dueCount}</span>`;
                 }
-                row += `<td class="cal-cell${count>0?' has-due':''}${isPast?' is-overdue':''}${isToday?' is-today':''}">${cellContent}</td>`;
+                if (newCount > 0) {
+                    cellContent += `<span class="cal-badge cal-badge--new" data-date="${dateStr}" data-type="new" title="${lang==='id'?'Baru':'新签'}: ${newCount}">🆕${newCount}</span>`;
+                }
+                if (isRestDay && !isPast) {
+                    cellContent += `<span class="cal-rest-dot" title="${lang==='id'?'Hari tenang':'可休息'}">●</span>`;
+                }
+
+                row += `<td class="${cellCls}"${bgStyle}>${cellContent}</td>`;
                 day++;
             }
             row += '</tr>';
@@ -125,9 +142,18 @@
             if (day > totalDays) break;
         }
 
+        const year_str = year;
+        const month_str = monthNames[month];
         return `
             <div class="work-calendar">
-                <div class="calendar-header">${monthNames[month]} ${year}</div>
+                <div class="calendar-header">
+                    <span>${month_str} ${year_str}</span>
+                    <span class="cal-legend">
+                        <span class="cal-legend-item"><span class="cal-badge cal-badge--due">💰</span>${lang==='id'?'Jatuh Tempo':'到期还款'}</span>
+                        <span class="cal-legend-item"><span class="cal-badge cal-badge--new">🆕</span>${lang==='id'?'Order Baru':'新签订单'}</span>
+                        <span class="cal-legend-item"><span class="cal-rest-dot">●</span>${lang==='id'?'Tenang':'可休息'}</span>
+                    </span>
+                </div>
                 <table class="cal-table">
                     <tbody>${tableRows}</tbody>
                 </table>
@@ -674,20 +700,34 @@
                             try {
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
-                                const in7Days = new Date(today);
-                                in7Days.setDate(in7Days.getDate() + 7);
-                                const todayStr = today.toISOString().split('T')[0];
-                                const in7DaysStr = in7Days.toISOString().split('T')[0];
-                                // 只取 next_interest_due_date 在今天到7天内（含今天、含逾期）的活跃订单
-                                const r = await applyFilter(
+                                const year = today.getFullYear();
+                                const month = today.getMonth();
+                                const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
+                                const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${String(new Date(year, month+1, 0).getDate()).padStart(2,'0')}`;
+                                // 本月到期订单（active状态，整月范围）
+                                const rDue = await applyFilter(
                                     client.from('orders')
-                                        .select('order_id, customer_name, next_interest_due_date')
+                                        .select('order_id, customer_name, next_interest_due_date, loan_amount, status, custom_order_date, created_at')
                                         .eq('status', 'active')
-                                        .lte('next_interest_due_date', in7DaysStr)
+                                        .gte('next_interest_due_date', monthStart)
+                                        .lte('next_interest_due_date', monthEnd)
                                         .not('next_interest_due_date', 'is', null)
                                 );
-                                return r.data || [];
-                            } catch (e) { return []; }
+                                // 本月新签订单（所有状态）
+                                const rNew = await applyFilter(
+                                    client.from('orders')
+                                        .select('order_id, customer_name, loan_amount, status, custom_order_date, created_at')
+                                        .gte('created_at', monthStart + 'T00:00:00.000Z')
+                                        .lte('created_at', monthEnd + 'T23:59:59.999Z')
+                                );
+                                return {
+                                    dueOrders: rDue.data || [],
+                                    newOrders: (rNew.data || []).map(o => ({
+                                        ...o,
+                                        _signDate: o.custom_order_date || (o.created_at || '').substring(0, 10)
+                                    }))
+                                };
+                            } catch (e) { return { dueOrders: [], newOrders: [] }; }
                         })()
                     ]);
 
@@ -726,7 +766,16 @@
                         total_loan_amount: totalLoanAll, admin_fees_collected: adminFeesCollected,
                         service_fees_collected: serviceFeesCollected, interest_collected: interestCollected,
                         principal_collected: principalCollected, total_injected_capital: injected,
-                        deployed_capital: deployed, available_capital: injected - deployed, due_orders: dueOrdersRes
+                        deployed_capital: deployed, available_capital: injected - deployed,
+                        due_orders: (dueOrdersRes && dueOrdersRes.dueOrders) ? dueOrdersRes.dueOrders.filter(o => {
+                            // 7日内到期用于 KPI 小卡
+                            const d = o.next_interest_due_date; if (!d) return false;
+                            const due = new Date(d); due.setHours(0,0,0,0);
+                            const now = new Date(); now.setHours(0,0,0,0);
+                            return (due - now) <= 7 * 86400000;
+                        }) : (Array.isArray(dueOrdersRes) ? dueOrdersRes : []),
+                        calendar_due: (dueOrdersRes && dueOrdersRes.dueOrders) ? dueOrdersRes.dueOrders : [],
+                        calendar_new: (dueOrdersRes && dueOrdersRes.newOrders) ? dueOrdersRes.newOrders : []
                     };
                 }, { ttl: 10 * 60 * 1000 });
 
@@ -798,10 +847,16 @@
                 const netProfitInitial = 0;
 
                 const dueOrders = kpiReport.due_orders || [];
+                const calDueOrders = kpiReport.calendar_due || dueOrders;
+                const calNewOrders = kpiReport.calendar_new || [];
+                // 构建到期日 Map
                 const dueMap = {};
-                dueOrders.forEach(o => { const d = o.next_interest_due_date; if (!d) return; if (!dueMap[d]) dueMap[d] = []; dueMap[d].push(o); });
+                calDueOrders.forEach(o => { const d = o.next_interest_due_date; if (!d) return; if (!dueMap[d]) dueMap[d] = []; dueMap[d].push(o); });
+                // 构建新签 Map
+                const newMap = {};
+                calNewOrders.forEach(o => { const d = o._signDate; if (!d) return; if (!newMap[d]) newMap[d] = []; newMap[d].push(o); });
 
-                const calendarHTML = buildWorkCalendarHTML(dueOrders, lang, dueMap);
+                const calendarHTML = buildWorkCalendarHTML(calDueOrders, lang, dueMap, newMap);
 
                 const kpiRowHTML = `
 <div class="kpi-row kpi-row--calendar">
@@ -925,21 +980,75 @@
                 const dashMain = document.querySelector('.dash-main');
                 if (dashMain) {
                     dashMain.addEventListener('click', function(e) {
-                        const target = e.target.closest('.cal-due-count');
+                        const target = e.target.closest('.cal-badge');
                         if (!target) return;
                         e.stopPropagation();
                         const date = target.dataset.date;
-                        const orders = dueMap[date];
-                        if (!orders || !orders.length) return;
-                        let listHtml = `<div class="cal-popup" id="calPopup"><div class="cal-popup-title">📅 ${Utils.formatDate(date)}</div><ul>`;
-                        orders.forEach(o => { const safeOrderId = Utils.escapeAttr(o.order_id); listHtml += `<li><a href="#" onclick="event.preventDefault(); JF.DashboardCore.navigateTo('viewOrder',{orderId:'${safeOrderId}'})">${Utils.escapeHtml(o.order_id)} - ${Utils.escapeHtml(o.customer_name)}</a></li>`; });
-                        listHtml += '</ul></div>';
-                        const oldPopup = document.querySelector('.cal-popup'); if (oldPopup) oldPopup.remove();
-                        document.body.insertAdjacentHTML('beforeend', listHtml);
-                        const popup = document.getElementById('calPopup'); if (!popup) return;
+                        const type = target.dataset.type; // 'due' or 'new'
+                        const dueList  = dueMap[date] || [];
+                        const newList  = newMap[date]  || [];
+                        const lang = Utils.lang;
+
+                        const oldPopup = document.getElementById('calPopup');
+                        if (oldPopup) { oldPopup.remove(); return; }
+
+                        const renderOrderCard = (o, kind) => {
+                            const safeId = Utils.escapeAttr(o.order_id);
+                            const icon = kind === 'due' ? '💰' : '🆕';
+                            const labelCls = kind === 'due' ? 'cal-popup-badge--due' : 'cal-popup-badge--new';
+                            const label = kind === 'due'
+                                ? (lang === 'id' ? 'Jatuh Tempo' : '到期还款')
+                                : (lang === 'id' ? 'Order Baru' : '新签订单');
+                            const amount = o.loan_amount ? Utils.formatCurrency(o.loan_amount) : '-';
+                            return `<div class="cal-popup-card" onclick="JF.DashboardCore.navigateTo('viewOrder',{orderId:'${safeId}'}); document.getElementById('calPopup')?.remove();">
+                                <div class="cal-popup-card-top">
+                                    <span class="cal-popup-order">${Utils.escapeHtml(o.order_id)}</span>
+                                    <span class="cal-popup-badge ${labelCls}">${icon} ${label}</span>
+                                </div>
+                                <div class="cal-popup-card-name">${Utils.escapeHtml(o.customer_name)}</div>
+                                <div class="cal-popup-card-amount">${amount}</div>
+                            </div>`;
+                        };
+
+                        let cardsHtml = '';
+                        if (dueList.length > 0) {
+                            cardsHtml += `<div class="cal-popup-section-title">💰 ${lang==='id'?'Jatuh Tempo':'到期还款'} (${dueList.length})</div>`;
+                            dueList.forEach(o => cardsHtml += renderOrderCard(o, 'due'));
+                        }
+                        if (newList.length > 0) {
+                            cardsHtml += `<div class="cal-popup-section-title">🆕 ${lang==='id'?'Order Baru':'新签订单'} (${newList.length})</div>`;
+                            newList.forEach(o => cardsHtml += renderOrderCard(o, 'new'));
+                        }
+                        if (!cardsHtml) return;
+
+                        const popupHtml = `<div class="cal-popup" id="calPopup">
+                            <div class="cal-popup-header">
+                                <span>📅 ${Utils.formatDate(date)}</span>
+                                <span class="cal-popup-close" onclick="document.getElementById('calPopup').remove()">✕</span>
+                            </div>
+                            <div class="cal-popup-body">${cardsHtml}</div>
+                        </div>`;
+
+                        document.body.insertAdjacentHTML('beforeend', popupHtml);
+                        const popup = document.getElementById('calPopup');
+                        if (!popup) return;
                         const rect = target.getBoundingClientRect();
-                        popup.style.position = 'fixed'; popup.style.top = (rect.bottom + 5) + 'px'; popup.style.left = Math.min(rect.left, window.innerWidth - 260) + 'px'; popup.style.zIndex = '10000';
-                        setTimeout(() => { const closeHandler = function(ev) { if (popup && !popup.contains(ev.target) && ev.target !== target) { popup.remove(); document.removeEventListener('click', closeHandler); } }; document.addEventListener('click', closeHandler); }, 10);
+                        const popW = 280;
+                        let left = rect.left;
+                        if (left + popW > window.innerWidth - 12) left = window.innerWidth - popW - 12;
+                        let top = rect.bottom + 6;
+                        if (top + 300 > window.innerHeight) top = rect.top - 10 - popup.offsetHeight;
+                        popup.style.cssText = `position:fixed;top:${top}px;left:${left}px;z-index:10000;`;
+
+                        setTimeout(() => {
+                            const closeHandler = function(ev) {
+                                const p = document.getElementById('calPopup');
+                                if (p && !p.contains(ev.target) && !ev.target.closest('.cal-badge')) {
+                                    p.remove(); document.removeEventListener('click', closeHandler);
+                                }
+                            };
+                            document.addEventListener('click', closeHandler);
+                        }, 10);
                     });
                 }
 
