@@ -409,8 +409,8 @@
                                     <div class="payment-method-group">
                                         <div class="payment-method-title">${t('recording_method')}:</div>
                                         <div class="payment-method-options">
-                                            <label><input type="radio" name="principalTarget" value="bank" checked> 🏧 ${t('bank')}</label>
-                                            <label><input type="radio" name="principalTarget" value="cash"> 🏦 ${t('cash')}</label>
+                                            <label><input type="radio" name="principalTarget" value="cash" checked> 🏦 ${t('cash')}</label>
+                                            <label><input type="radio" name="principalTarget" value="bank"> 🏧 ${t('bank')}</label>
                                         </div>
                                     </div>
                                     <div class="action-buttons">
@@ -578,7 +578,7 @@
         // ==================== 本金收款 ====================
         async payPrincipalWithMethod(orderId) {
             const amount = Utils.getAmountFromInput('principalAmount');
-            const target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
+            const target = document.querySelector('input[name="principalTarget"]:checked')?.value || 'cash';
             const targetName = target === 'cash' ? Utils.t('cash') : Utils.t('bank');
             const lang = Utils.lang;
             const principalDateInput = document.getElementById('principalPaymentDate');
@@ -731,7 +731,7 @@
             try {
                 const order = await SUPABASE.getOrder(orderId);
                 const remainingPrincipal = order.principal_remaining ?? (order.loan_amount - (order.principal_paid || 0));
-                const method = document.querySelector('input[name="principalTarget"]:checked')?.value || 'bank';
+                const method = document.querySelector('input[name="principalTarget"]:checked')?.value || 'cash';
                 const methodName = method === 'cash' ? (lang === 'id' ? 'Tunai' : '现金') : (lang === 'id' ? 'Bank' : '银行');
                 const inputAmount = Utils.getAmountFromInput('principalAmount');
                 const hasInput = !isNaN(inputAmount) && inputAmount > 0;
