@@ -548,8 +548,12 @@
                     Utils.toast.warning(shortfallMsg, 8000);
                 } else if (isPrepaid) {
                     Utils.toast.success(lang === 'id' ? `✅ Bayar muka ${selectedMonths} bulan berhasil!` : `✅ 预付 ${selectedMonths} 期利息成功！`, 5000);
+                    // 还款成功：清除仪表盘缓存，确保逾期/到期状态实时更新
+                    if (window.JF?.Cache) JF.Cache.clear();
                 } else {
                     Utils.toast.success(lang === 'id' ? 'Pembayaran bunga berhasil!' : '利息收款成功！');
+                    // 还款成功：清除仪表盘缓存，确保逾期/到期状态实时更新
+                    if (window.JF?.Cache) JF.Cache.clear();
                 }
 
                 if (window.Audit) {
@@ -628,11 +632,14 @@
                 if (window.Audit) await window.Audit.logPayment(order.order_id, 'principal', actualAmount, target);
 
                 if (isFullSettlement) {
+                    if (window.JF?.Cache) JF.Cache.clear();
                     const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
                     const printConfirmed = await Utils.toast.confirm(printConfirm);
                     if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                 }
                 Utils.toast.success(lang === 'id' ? 'Pembayaran pokok berhasil!' : '本金还款成功！');
+                    // 还款成功：清除仪表盘缓存，确保逾期/到期状态实时更新
+                    if (window.JF?.Cache) JF.Cache.clear();
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
@@ -707,7 +714,8 @@
                 await SUPABASE.earlySettleFixedOrder(orderId, method);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
-                const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
+                if (window.JF?.Cache) JF.Cache.clear();
+                    const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
                 const printConfirmed = await Utils.toast.confirm(printConfirm);
                 if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                 await PaymentPage.showPayment(orderId);
@@ -768,7 +776,8 @@
                 await SUPABASE.earlySettleFlexibleOrder(orderId, method, remainingPrincipal);
                 if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
-                const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
+                if (window.JF?.Cache) JF.Cache.clear();
+                    const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
                 const printConfirmed = await Utils.toast.confirm(printConfirm);
                 if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
                 await PaymentPage.showPayment(orderId);

@@ -768,11 +768,12 @@
                         principal_collected: principalCollected, total_injected_capital: injected,
                         deployed_capital: deployed, available_capital: injected - deployed,
                         due_orders: (dueOrdersRes && dueOrdersRes.dueOrders) ? dueOrdersRes.dueOrders.filter(o => {
-                            // 7日内到期用于 KPI 小卡
+                            // 7日内到期：只计未来0~7天，不含已逾期（逾期有专门的逾期订单计数）
                             const d = o.next_interest_due_date; if (!d) return false;
                             const due = new Date(d); due.setHours(0,0,0,0);
                             const now = new Date(); now.setHours(0,0,0,0);
-                            return (due - now) <= 7 * 86400000;
+                            const diff = due - now;
+                            return diff >= 0 && diff <= 7 * 86400000;
                         }) : (Array.isArray(dueOrdersRes) ? dueOrdersRes : []),
                         calendar_due: (dueOrdersRes && dueOrdersRes.dueOrders) ? dueOrdersRes.dueOrders : [],
                         calendar_new: (dueOrdersRes && dueOrdersRes.newOrders) ? dueOrdersRes.newOrders : []
