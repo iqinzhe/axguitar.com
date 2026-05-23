@@ -134,6 +134,11 @@
 
             try {
                 await this.loadCurrentUser();
+                // 如果首次加载失败（401 token 过期），等 Supabase 刷新 token 后再试一次
+                if (!this.user) {
+                    await new Promise(r => setTimeout(r, 800));
+                    await this.loadCurrentUser();
+                }
             } catch (e) {
                 console.warn('[Auth] 加载用户失败，清除认证状态:', e.message);
                 await this.forceClearAuth();
@@ -210,7 +215,16 @@
 
         // ==================== 用户状态查询 ====================
         isLoggedIn()      { return !!this.user; },
-        isAdmin()         { return this.user?.role === 'admin'; },
+        isAdmin()         {
+            if (this.user) return this.user.role === 'admin';
+            // user 为 null 时异步重载，触发页面刷新
+            this.loadCurrentUser().then(() => {
+                if (this.user && window.JF?.DashboardCore?.refreshCurrentPage) {
+                    JF.DashboardCore.refreshCurrentPage();
+                }
+            }).catch(() => {});
+            return false;
+        },
         isStoreManager()  { return this.user?.role === 'store_manager'; },
         isStaff()         { return this.user?.role === 'staff'; },
         canManageOrders() { return ['admin', 'store_manager', 'staff'].includes(this.user?.role); },

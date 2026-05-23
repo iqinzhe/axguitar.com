@@ -15,7 +15,8 @@
         async buildCustomersHTML() {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
-            const isAdmin = PERMISSION.isAdmin();
+            const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
 
             try {
                 let customers = await SUPABASE.getCustomers();
@@ -319,8 +320,8 @@
         showCustomerDetailCard: async function (customerId) {
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
-            const isAdmin = PERMISSION.isAdmin();
             const profile = await SUPABASE.getCurrentProfile();
+            const isAdmin = profile?.role === 'admin';
 
             try {
                 const customer = await SUPABASE.getCustomer(customerId);
