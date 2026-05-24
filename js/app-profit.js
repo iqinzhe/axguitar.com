@@ -155,9 +155,9 @@
                     </div>
                 `;
 
-                // 修复移动端滚动截断：在内容外层包裹可滚动容器
-                const mobileScrollStyle = 'overflow-y:auto; height:100vh; -webkit-overflow-scrolling:touch; padding-bottom:16px; box-sizing:border-box;';
-                document.getElementById('app').innerHTML = `<div style="${mobileScrollStyle}">${content}</div>`;
+                // 滚动由 .dash-main (overflow-y:auto) 统一管理，无需内层包裹额外滚动容器。
+                // 原来的 height:100vh 包裹会在桌面端产生嵌套滚动陷阱，已移除。
+                document.getElementById('app').innerHTML = content;
 
                 // 绑定金额输入格式化
                 const reinvestInput = document.getElementById('reinvestAmount');
