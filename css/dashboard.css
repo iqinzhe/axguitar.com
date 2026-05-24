@@ -758,8 +758,32 @@
   }
   .loading-text { font-size: 1rem; color: var(--gray-600); font-family: var(--font-sans); }
   .loading-text::after { content: "..."; animation: dots 1.5s steps(4, end) infinite; display: inline-block; width: 28px; text-align: left; }
-  .dashboard-content { opacity: 0; transition: opacity 0.3s ease; }
+  /* ---------------------------------------------------------------
+     修复：编辑订单等页面直接向 #app 注入 HTML，而 #app 位于
+     .dashboard-content 内，不在 .dash-main 的滚动区域里，导致
+     内容过长时无法上下滑动。
+     解决方案：.dash-main 本身已是 overflow-y:auto 的滚动容器，
+     只需让 .dashboard-content 和 #app 均为 flex 流中的正常块元素，
+     高度由内容撑开，即可让 .dash-main 统一管理滚动。
+  --------------------------------------------------------------- */
+  .dashboard-content {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    /* flex 子元素：跟随内容自然撑高，不限制高度，
+       让 .dash-main 的 overflow-y:auto 统一负责滚动 */
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
   .dashboard-content.loaded { opacity: 1; }
+
+  /* #app 撑满父级宽度 */
+  #app {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes dots { 0%,20%{content:""}40%{content:"."}60%{content:".."}80%,100%{content:"..."} }
