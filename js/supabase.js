@@ -2330,17 +2330,22 @@
     };
 
     // ==================== 管理员：逐条同步缴费记录（利息/本金）====================
-    SupabaseAPI.adminSyncPaymentRecords = async function(orderId, editedRecords) {
+    // BUG修复：新增 newOrderDate 参数，使函数在管理员修改订单日期后能正确重算
+    // next_interest_due_date 和 overdue_days/liquidation_status，
+    // 避免仪表盘持续显示已纠正订单的"逾期"状态。
+    SupabaseAPI.adminSyncPaymentRecords = async function(orderId, editedRecords, newOrderDate) {
         if (!supabaseClient) throw new Error('客户端未初始化');
         const profile = await this.getCurrentProfile();
         if (profile?.role !== 'admin') throw new Error(Utils.lang === 'id' ? 'Hanya admin' : '需管理员权限');
 
         const { data: orderRow, error: orderErr } = await supabaseClient
             .from('orders')
-            .select('id, order_id, loan_amount, agreed_interest_rate, interest_shortfall, store_id, customer_id, customer_name, customer_ktp, customer_phone, customer_address')
+            .select('id, order_id, loan_amount, agreed_interest_rate, interest_shortfall, store_id, customer_id, customer_name, customer_ktp, customer_phone, customer_address, custom_order_date, created_at, next_interest_due_date, overdue_days, liquidation_status, fund_status')
             .eq('order_id', orderId).single();
         if (orderErr || !orderRow) throw new Error(Utils.lang === 'id' ? 'Pesanan tidak ditemukan' : '订单不存在');
         const orderUUID = orderRow.id;
+        // 确定本次生效的订单基准日期：优先用调用方传入的新日期，否则取数据库中已有日期
+        const effectiveOrderDate = newOrderDate || orderRow.custom_order_date || (orderRow.created_at || '').substring(0, 10) || todayStr();
 
         const { toDelete = [], toUpdate = [], toAdd = [], customerUpdates = null } = editedRecords;
 
@@ -2399,14 +2404,39 @@
         const monthlyInterest   = principalRemaining * agreedRate;
         const newStatus         = principalRemaining <= 0 ? 'completed' : 'active';
 
+        // BUG修复：重新计算 next_interest_due_date
+        // 管理员修改订单日期后，到期日必须基于新日期重算，否则 updateOverdueDays()
+        // 仍用旧到期日计算逾期天数，仪表盘持续显示错误的逾期状态。
+        const newNextDueDate = Utils.calculateNextDueDate(effectiveOrderDate, interestMonths);
+
+        // BUG修复：基于新到期日立即重算逾期天数和逾期状态，不等定时器（每18分钟才触发）
+        const todayJakarta = Utils.getJakartaDate ? Utils.getJakartaDate() : new Date();
+        todayJakarta.setUTCHours(0, 0, 0, 0);
+        const todayTime = todayJakarta.getTime();
+        const [dyear, dmonth, dday] = newNextDueDate.split('-').map(Number);
+        const dueTime = new Date(Date.UTC(dyear, dmonth - 1, dday, 0, 0, 0)).getTime();
+        const newOverdueDays = todayTime > dueTime ? Math.floor((todayTime - dueTime) / 86400000) : 0;
+        let newLiqStatus = 'normal';
+        let newFundStatus = orderRow.fund_status;
+        if (newStatus === 'active') {
+            if (newOverdueDays >= 30)      { newLiqStatus = 'auction';     newFundStatus = 'forfeited'; }
+            else if (newOverdueDays >= 20) { newLiqStatus = 'pre_auction'; }
+            else if (newOverdueDays >= 10) { newLiqStatus = 'collection';  }
+            else                           { newLiqStatus = 'normal';      }
+        }
+
         const summaryUpd = {
-            interest_paid_months: interestMonths,
-            interest_paid_total:  interestTotal,
-            principal_paid:       principalPaid,
-            principal_remaining:  principalRemaining,
-            monthly_interest:     monthlyInterest,
-            status:               newStatus,
-            updated_at:           nowStr(),
+            interest_paid_months:   interestMonths,
+            interest_paid_total:    interestTotal,
+            principal_paid:         principalPaid,
+            principal_remaining:    principalRemaining,
+            monthly_interest:       monthlyInterest,
+            status:                 newStatus,
+            next_interest_due_date: newNextDueDate,
+            overdue_days:           newOverdueDays,
+            liquidation_status:     newLiqStatus,
+            fund_status:            newFundStatus,
+            updated_at:             nowStr(),
         };
         if (newStatus === 'completed') summaryUpd.completed_at = summaryUpd.updated_at;
 

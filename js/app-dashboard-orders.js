@@ -1402,7 +1402,11 @@
                 if (res.error) throw res.error;
 
                 await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid && adminFee > 0, serviceFee, orderDate);
-                await SUPABASE.adminSyncPaymentRecords(orderId, payEdits);
+                // BUG修复：传入新订单日期，使 adminSyncPaymentRecords 能正确重算
+                // next_interest_due_date 和 overdue_days（否则仪表盘逾期状态不会立即更新）
+                await SUPABASE.adminSyncPaymentRecords(orderId, payEdits, orderDate);
+                // BUG修复：保存后立即重跑逾期计算，不等定时器（每18分钟才触发一次）
+                try { await SUPABASE.updateOverdueDays(); } catch(e) { console.warn('[adminSaveOrder] updateOverdueDays 失败:', e.message); }
                 await SUPABASE.relockOrder(orderId);
 
                 Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
