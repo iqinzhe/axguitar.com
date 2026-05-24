@@ -555,20 +555,24 @@
     };
 
     Utils.toLocalDate = function (dateInput) {
+        // BUG-02修复：不再对含 T 的时间戳提前截断返回，统一走 UTC→Jakarta(+7) 换算，
+        // 避免 UTC 18:00 等跨日时间被错误识别为前一天日期。
+        // BUG-08修复：对纯日期字符串（如 "2024-01-31"），直接返回而不经过 new Date() 解析，
+        // 因为 new Date("2024-01-31") 会按 UTC 午夜解析，再加 getTimezoneOffset()（浏览器本地时区）
+        // 会引入不确定的偏差。纯日期字符串本身已是雅加达本地日期，无需再换算。
         if (!dateInput) return Utils.getLocalToday();
         let date;
         if (typeof dateInput === 'string') {
-            if (dateInput.includes('T')) {
-                const parts = dateInput.split('T')[0].split('-');
-                if (parts.length === 3) return parts.join('-');
-            }
+            // 纯日期格式 YYYY-MM-DD：直接返回，无需时区换算
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return dateInput;
+            // 含时间/时区信息的字符串：交由 Date 解析后做 UTC→Jakarta 换算
             date = new Date(dateInput);
         } else {
             date = dateInput;
         }
         if (isNaN(date.getTime())) return Utils.getLocalToday();
-        const utcMs = date.getTime() + date.getTimezoneOffset() * 60000;
-        const jakartaMs = utcMs + JAKARTA_UTC_OFFSET * 60000;
+        // 统一换算：先取 UTC 毫秒，再加 Jakarta 偏移（+7h）
+        const jakartaMs = date.getTime() + JAKARTA_UTC_OFFSET * 60000;
         const jakartaDate = new Date(jakartaMs);
         return (
             jakartaDate.getUTCFullYear() +

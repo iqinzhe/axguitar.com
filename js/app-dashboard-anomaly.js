@@ -342,32 +342,155 @@
         },
 
         async startAuction(orderId) {
+            // BUG-03修复：原来一律以 loan_amount 按 collateral_sale_principal 入账，
+            // 既不区分盈余/亏损，也不支持填写实际变卖金额，导致资金台账严重失真。
+            // 修复：弹出实际变卖金额输入框，并按本金回收/利息回收/盈余/亏损分拆流水。
             const lang = Utils.lang;
-            const confirmed = await Utils.toast.confirm(lang==='id'
-                ? '⚠️ Mulai proses likuidasi? Tindakan ini tidak dapat dibatalkan.'
-                : '⚠️ 确定启动变卖程序？此操作不可逆。');
-            if (!confirmed) return;
+            const client = SUPABASE.getClient();
+
+            // 第一步：获取订单信息
+            let order;
             try {
-                const client = SUPABASE.getClient();
-                const order = await SUPABASE.getOrder(orderId);
+                order = await SUPABASE.getOrder(orderId);
                 if (!order) throw new Error('Order not found');
+            } catch(e) {
+                Utils.toast.error(lang==='id'?'Gagal memuat pesanan: '+e.message:'加载订单失败：'+e.message);
+                return;
+            }
+
+            const loanAmount = order.loan_amount || 0;
+            const accruedInterest = (order.monthly_interest || 0) + (order.interest_shortfall || 0);
+            const totalOwed = loanAmount + accruedInterest;
+
+            // 第二步：询问实际变卖金额
+            const promptMsg = lang==='id'
+                ? `⚖️ Konfirmasi Likuidasi Jaminan
+
+Pesanan: ${order.order_id}
+Nasabah: ${order.customer_name}
+
+Pokok: ${Utils.formatCurrency(loanAmount)}
+Bunga terutang: ${Utils.formatCurrency(accruedInterest)}
+Total tagihan: ${Utils.formatCurrency(totalOwed)}
+
+Masukkan harga jual aktual jaminan (Rp):`
+                : `⚖️ 确认变卖抵押物
+
+订单号：${order.order_id}
+客户：${order.customer_name}
+
+本金：${Utils.formatCurrency(loanAmount)}
+应收利息：${Utils.formatCurrency(accruedInterest)}
+合计应收：${Utils.formatCurrency(totalOwed)}
+
+请输入实际变卖所得金额（Rp）：`;
+
+            const inputStr = prompt(promptMsg, Utils.formatNumberWithCommas ? Utils.formatNumberWithCommas(loanAmount) : String(loanAmount));
+            if (inputStr === null) return; // 用户取消
+
+            const salePrice = Utils.parseNumberFromCommas ? Utils.parseNumberFromCommas(inputStr) : parseFloat(inputStr.replace(/[,.]/g, ''));
+            if (isNaN(salePrice) || salePrice < 0) {
+                Utils.toast.warning(lang==='id'?'Jumlah tidak valid':'金额无效');
+                return;
+            }
+
+            // 第三步：最终确认
+            const surplus = salePrice - totalOwed;
+            const summaryMsg = lang==='id'
+                ? `📊 Ringkasan Likuidasi:
+
+Harga jual: ${Utils.formatCurrency(salePrice)}
+Pokok kembali: ${Utils.formatCurrency(Math.min(salePrice, loanAmount))}
+Bunga kembali: ${Utils.formatCurrency(Math.max(0, Math.min(salePrice - loanAmount, accruedInterest)))}
+${surplus > 0 ? 'Surplus: ' + Utils.formatCurrency(surplus) : surplus < 0 ? 'Kurang (rugi): ' + Utils.formatCurrency(Math.abs(surplus)) : 'Impas'}
+
+⚠️ Tindakan ini tidak dapat dibatalkan!
+Lanjutkan?`
+                : `📊 变卖结算预览：
+
+变卖所得：${Utils.formatCurrency(salePrice)}
+回收本金：${Utils.formatCurrency(Math.min(salePrice, loanAmount))}
+回收利息：${Utils.formatCurrency(Math.max(0, Math.min(salePrice - loanAmount, accruedInterest)))}
+${surplus > 0 ? '盈余：'+Utils.formatCurrency(surplus) : surplus < 0 ? '亏损：'+Utils.formatCurrency(Math.abs(surplus)) : '持平'}
+
+⚠️ 此操作不可逆！
+确认变卖？`;
+
+            const confirmed = await Utils.toast.confirm(summaryMsg);
+            if (!confirmed) return;
+
+            try {
+                const today = Utils.getLocalToday();
+
+                // 更新订单状态
                 await client.from('orders').update({
                     status: 'liquidated',
                     liquidation_status: 'liquidated',
                     fund_status: 'forfeited',
                     updated_at: Utils.getLocalDateTime()
                 }).eq('order_id', orderId);
-                await SUPABASE.recordCashFlow({
-                    store_id: order.store_id,
-                    flow_type: 'collateral_sale_principal',
-                    direction: 'inflow',
-                    amount: order.loan_amount,
-                    source_target: 'cash',
-                    order_id: order.id,
-                    description: lang==='id'?'Likuidasi jaminan':'抵押物变卖',
-                    reference_id: order.order_id
-                });
-                Utils.toast.success(lang==='id'?'✅ Proses likuidasi dimulai':'✅ 变卖程序已启动');
+
+                // 拆分流水：本金回收部分
+                const principalRecovered = Math.min(salePrice, loanAmount);
+                if (principalRecovered > 0) {
+                    await SUPABASE.recordCashFlow({
+                        store_id: order.store_id,
+                        flow_type: 'collateral_sale_principal',
+                        direction: 'inflow',
+                        amount: principalRecovered,
+                        source_target: 'cash',
+                        order_id: order.id,
+                        description: (lang==='id'?'Likuidasi - Pokok':'变卖-本金回收') + ' - ' + order.order_id,
+                        reference_id: order.order_id,
+                        flow_date: today
+                    });
+                }
+
+                // 拆分流水：利息回收部分
+                const remaining1 = salePrice - principalRecovered;
+                const interestRecovered = Math.max(0, Math.min(remaining1, accruedInterest));
+                if (interestRecovered > 0) {
+                    await SUPABASE.recordCashFlow({
+                        store_id: order.store_id,
+                        flow_type: 'collateral_sale_interest',
+                        direction: 'inflow',
+                        amount: interestRecovered,
+                        source_target: 'cash',
+                        order_id: order.id,
+                        description: (lang==='id'?'Likuidasi - Bunga':'变卖-利息回收') + ' - ' + order.order_id,
+                        reference_id: order.order_id,
+                        flow_date: today
+                    });
+                }
+
+                // 拆分流水：盈余或亏损
+                if (surplus > 0) {
+                    await SUPABASE.recordCashFlow({
+                        store_id: order.store_id,
+                        flow_type: 'collateral_sale_surplus',
+                        direction: 'inflow',
+                        amount: surplus,
+                        source_target: 'cash',
+                        order_id: order.id,
+                        description: (lang==='id'?'Likuidasi - Surplus':'变卖-盈余') + ' - ' + order.order_id,
+                        reference_id: order.order_id,
+                        flow_date: today
+                    });
+                } else if (surplus < 0) {
+                    await SUPABASE.recordCashFlow({
+                        store_id: order.store_id,
+                        flow_type: 'collateral_sale_loss',
+                        direction: 'outflow',
+                        amount: Math.abs(surplus),
+                        source_target: 'cash',
+                        order_id: order.id,
+                        description: (lang==='id'?'Likuidasi - Rugi':'变卖-亏损') + ' - ' + order.order_id,
+                        reference_id: order.order_id,
+                        flow_date: today
+                    });
+                }
+
+                Utils.toast.success(lang==='id'?'✅ Likuidasi selesai dicatat':'✅ 变卖流水已全部记录');
                 if (JF.DashboardCore?.refreshCurrentPage) await JF.DashboardCore.refreshCurrentPage();
                 else if (APP.showAnomaly) await APP.showAnomaly();
             } catch (error) {

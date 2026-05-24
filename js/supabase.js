@@ -161,11 +161,13 @@
     const todayStr = () => Utils.getLocalToday();
     const nowStr = () => Utils.getLocalDateTime();
 
-    // 问题4修复：业务日期统一从此函数取，优先 custom_order_date，回退 created_at，兜底今天
+    // 业务日期统一从此函数取，优先 custom_order_date，回退 created_at，兜底今天。
+    // BUG-08修复：created_at 为 UTC 时间戳，substring(0,10) 会截到 UTC 日期而非 Jakarta 日期；
+    // 改用 Utils.toLocalDate() 统一做 UTC→Jakarta(+7) 换算，避免跨日场景差一天。
     const orderDate = (order) => {
         if (!order) return todayStr();
         if (order.custom_order_date) return order.custom_order_date;
-        if (order.created_at) return order.created_at.substring(0, 10);
+        if (order.created_at) return Utils.toLocalDate(order.created_at);
         return todayStr();
     };
 
@@ -931,6 +933,9 @@
             };
         },
 
+        // BUG-09修复：之前只扣除 type='reinvest' 的处置记录，导致 return_capital / dividend_withdrawal
+        // 等其他类型的已处置金额不被扣除，可分配利润虚高，允许重复处置。
+        // 修复：查询所有处置类型的记录一并扣除。
         async getDistributableProfit(storeId) {
             const profile = await this.getCurrentProfile();
             const targetStoreId = storeId || profile?.store_id;
@@ -938,10 +943,11 @@
             const cashFlowSummary = await this.getCashFlowSummary(targetStoreId);
             const totalIncome = cashFlowSummary.netProfit?.operatingIncome || 0;
             const totalExpense = cashFlowSummary.netProfit?.operatingExpense || 0;
+            // 查询所有类型的处置记录（reinvest、return_capital、dividend_withdrawal 等）
             const { data: distributions } = await supabaseClient
-                .from('profit_distributions').select('amount').eq('store_id', targetStoreId).eq('type','reinvest');
-            const reinvested = (distributions||[]).reduce((sum,d)=>sum+(d.amount||0),0);
-            return Math.max(0, totalIncome - totalExpense - reinvested);
+                .from('profit_distributions').select('amount').eq('store_id', targetStoreId);
+            const totalDistributed = (distributions||[]).reduce((sum,d)=>sum+(d.amount||0),0);
+            return Math.max(0, totalIncome - totalExpense - totalDistributed);
         },
 
         async getExternalCapitalBalance(storeId) {
@@ -1249,10 +1255,12 @@
             return true;
         },
 
-        async syncFeesAfterAdminEdit(orderId, newAdminFee, newAdminFeePaid, newServiceFeeAmount, orderDate) {
+        // BUG-04修复：参数名 orderDate 与外层闭包的同名辅助函数冲突（变量遮蔽），
+        // 导致函数体内 orderDate(order) 调用时抛 TypeError。改为 customOrderDate 消除遮蔽。
+        async syncFeesAfterAdminEdit(orderId, newAdminFee, newAdminFeePaid, newServiceFeeAmount, customOrderDate) {
             const order = await this.getOrder(orderId);
             const profile = await this.getCurrentProfile();
-            const feeDate = (orderDate || orderDate(order));
+            const feeDate = customOrderDate || orderDate(order);
 
             await supabaseClient.from('payment_history')
                 .delete().eq('order_id', order.id).eq('type', 'admin_fee');
@@ -1362,7 +1370,26 @@
 
         async recordInterestPayment(orderId, months, paymentMethod, actualPaid=null, paymentDate=null) {
             if(paymentMethod===undefined) paymentMethod='cash';
-            const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
+            // BUG-07修复：服务端二次校验日期合法性。
+            // 非预付（months=1）：入账日不得超过今日；预付（months>1）：允许延伸到未来最多 months 个月。
+            const today = todayStr();
+            let recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : today;
+            if (months <= 1) {
+                // 非预付：拒绝未来日期
+                if (recordDate > today) {
+                    console.warn(`[recordInterestPayment] 非预付日期 ${recordDate} 超过今日 ${today}，已自动修正为今日`);
+                    recordDate = today;
+                }
+            } else {
+                // 预付：最远允许今日 + months 个月
+                const maxDateObj = new Date(today);
+                maxDateObj.setMonth(maxDateObj.getMonth() + months);
+                const maxDate = maxDateObj.toISOString().substring(0, 10);
+                if (recordDate > maxDate) {
+                    console.warn(`[recordInterestPayment] 预付日期 ${recordDate} 超出允许范围 ${maxDate}，已自动修正`);
+                    recordDate = maxDate;
+                }
+            }
             const profile = await this.getCurrentProfile();
             const currentOrder = await this.getOrder(orderId);
             
@@ -1548,12 +1575,14 @@
             return true;
         },
 
-        async recordFixedPayment(orderId, paymentMethod) {
+        // BUG-01修复：添加可选 paymentDate 参数，默认为当日，不再固定使用订单创建日。
+        // 原来用 orderDate(order) 导致今日还款却记录成开单日期，账期混乱。
+        async recordFixedPayment(orderId, paymentMethod, paymentDate) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
-            // 确定流水日期：优先使用订单创建日期，否则用当天
-            const recordDate = orderDate(order);
+            // 优先使用调用方传入的日期，否则用当天（修复：之前错误使用订单创建日）
+            const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
             
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1625,12 +1654,13 @@
             return true;
         },
 
-        async earlySettleFixedOrder(orderId, paymentMethod) {
+        // BUG-01修复：添加可选 paymentDate 参数，默认为当日。
+        async earlySettleFixedOrder(orderId, paymentMethod, paymentDate) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
-            // 确定流水日期：优先使用订单创建日期，否则用当天
-            const recordDate = orderDate(order);
+            // 优先使用调用方传入的日期，否则用当天（修复：之前错误使用订单创建日）
+            const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
             
             if (order.status === 'liquidated') {
                 throw new Error(Utils.lang === 'id' 
@@ -1671,7 +1701,8 @@
         },
 
         // ==================== 灵活还款提前结清 ====================
-        earlySettleFlexibleOrder: async function(orderId, paymentMethod, finalPrincipalAmount = null) {
+        // BUG-01修复：添加可选 paymentDate 参数，默认为当日。
+        earlySettleFlexibleOrder: async function(orderId, paymentMethod, finalPrincipalAmount = null, paymentDate = null) {
             if(paymentMethod===undefined) paymentMethod='cash';
             const profile = await this.getCurrentProfile();
             const order = await this.getOrder(orderId);
@@ -1698,7 +1729,8 @@
                 : remainingPrincipal;
             if (paidAmount <= 0) throw new Error(Utils.t('invalid_amount'));
             
-            const recordDate = orderDate(order);
+            // BUG-01修复：优先使用传入日期，否则用当天（原来错误使用订单创建日）
+            const recordDate = (paymentDate && /^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ? paymentDate : todayStr();
             
             await supabaseClient.from('payment_history').insert({
                 order_id: order.id, date: recordDate, type:'principal',
@@ -2216,13 +2248,16 @@
                 created_by: profile?.id, created_at: Utils.getLocalDateTime()
             }).select().single();
             if (error) throw error;
+            // BUG-06修复：显式传入 flow_date，确保流水日期与转账日期一致，支持未来补录历史转账。
+            const transferFlowDate = transferData.transfer_date || Utils.getLocalToday();
             await this.recordCashFlow({
                 store_id: transferData.store_id || profile?.store_id,
                 flow_type: 'internal_transfer_out', direction: 'outflow',
                 amount: transferData.amount,
                 source_target: transferData.from_account === 'hq' ? 'bank' : transferData.from_account,
                 description: Utils.lang === 'id' ? 'Transfer keluar' : '转出',
-                reference_id: data.id
+                reference_id: data.id,
+                flow_date: transferFlowDate
             });
             if (transferData.to_account !== 'hq') {
                 await this.recordCashFlow({
@@ -2230,7 +2265,8 @@
                     flow_type: 'internal_transfer_in', direction: 'inflow',
                     amount: transferData.amount, source_target: transferData.to_account,
                     description: Utils.lang === 'id' ? 'Transfer masuk' : '转入',
-                    reference_id: data.id
+                    reference_id: data.id,
+                    flow_date: transferFlowDate
                 });
             }
             return data;

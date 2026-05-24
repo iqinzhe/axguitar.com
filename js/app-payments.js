@@ -304,6 +304,11 @@
                                     <div class="payment-method-title">${t('recording_method')}:</div>
                                     <div class="payment-method-options"><label><input type="radio" name="fixedMethod" value="cash" checked> 🏦 ${t('cash')}</label><label><input type="radio" name="fixedMethod" value="bank"> 🏧 ${t('bank')}</label></div>
                                 </div>
+                                <div class="action-input-group">
+                                    <label class="action-label">📅 ${lang === 'id' ? 'Tanggal Pembayaran' : '入账日期'}:</label>
+                                    <input type="date" id="fixedPaymentDate" class="amount-input" value="${interestDateToday}" min="${orderCreatedDate}" max="${interestDateToday}">
+                                    <div class="form-hint">💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${orderCreatedDate})` : `可选择以前日期补录（最早：${orderCreatedDate}）`}</div>
+                                </div>
                                 <div class="action-buttons">
                                     <button onclick="APP.payFixedInstallment('${Utils.escapeAttr(order.order_id)}')" class="btn btn--success" id="fixedPayBtn">✅ ${t('pay_this_month')}</button>
                                     ${remainingMonths > 0 ? `<button onclick="APP.earlySettleFixedOrder('${Utils.escapeAttr(order.order_id)}')" class="btn btn--special" id="earlySettleBtn">🎯 ${t('early_settlement')}</button>` : ''}
@@ -671,7 +676,10 @@
                     Utils.toast.warning(lang === 'id' ? 'Pembayaran ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔付款在2分钟内已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
-                await SUPABASE.recordFixedPayment(orderId, method);
+                // BUG-01修复：读取日期选择器的值并传入，使流水日期反映实际收款日期
+                const fixedDateInput = document.getElementById('fixedPaymentDate');
+                const fixedPayDate = (fixedDateInput && fixedDateInput.value) ? fixedDateInput.value : Utils.getLocalToday();
+                await SUPABASE.recordFixedPayment(orderId, method, fixedPayDate);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'fixed_installment', fixedPaymentBefore, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
@@ -711,7 +719,10 @@
                     Utils.toast.warning(lang === 'id' ? 'Pelunasan ini sudah tercatat (2 menit terakhir), tidak perlu diproses ulang.' : '此笔结清在2分钟内已记录，无需重复处理。');
                     await PaymentPage.showPayment(orderId); return;
                 }
-                await SUPABASE.earlySettleFixedOrder(orderId, method);
+                // BUG-01修复：读取固定还款日期选择器并传入结清日期
+                const earlyFixedDateInput = document.getElementById('fixedPaymentDate');
+                const earlyFixedPayDate = (earlyFixedDateInput && earlyFixedDateInput.value) ? earlyFixedDateInput.value : Utils.getLocalToday();
+                await SUPABASE.earlySettleFixedOrder(orderId, method, earlyFixedPayDate);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 if (window.JF?.Cache) JF.Cache.clear();
@@ -773,7 +784,10 @@
                     await PaymentPage.showPayment(orderId); return;
                 }
 
-                await SUPABASE.earlySettleFlexibleOrder(orderId, method, remainingPrincipal);
+                // BUG-01修复：灵活还款结清同样读取本金日期选择器并传入
+                const flexSettleDateInput = document.getElementById('principalPaymentDate');
+                const flexSettleDate = (flexSettleDateInput && flexSettleDateInput.value) ? flexSettleDateInput.value : Utils.getLocalToday();
+                await SUPABASE.earlySettleFlexibleOrder(orderId, method, remainingPrincipal, flexSettleDate);
                 if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 if (window.JF?.Cache) JF.Cache.clear();
