@@ -758,31 +758,44 @@
   }
   .loading-text { font-size: 1rem; color: var(--gray-600); font-family: var(--font-sans); }
   .loading-text::after { content: "..."; animation: dots 1.5s steps(4, end) infinite; display: inline-block; width: 28px; text-align: left; }
-  /* ---------------------------------------------------------------
-     修复：编辑订单等页面直接向 #app 注入 HTML，而 #app 位于
-     .dashboard-content 内，不在 .dash-main 的滚动区域里，导致
-     内容过长时无法上下滑动。
-     解决方案：.dash-main 本身已是 overflow-y:auto 的滚动容器，
-     只需让 .dashboard-content 和 #app 均为 flex 流中的正常块元素，
-     高度由内容撑开，即可让 .dash-main 统一管理滚动。
-  --------------------------------------------------------------- */
-  .dashboard-content {
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    /* flex 子元素：跟随内容自然撑高，不限制高度，
-       让 .dash-main 的 overflow-y:auto 统一负责滚动 */
-    flex: 0 0 auto;
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-  }
+  .dashboard-content { opacity: 0; transition: opacity 0.3s ease; }
   .dashboard-content.loaded { opacity: 1; }
 
-  /* #app 撑满父级宽度 */
-  #app {
+  /* ---------------------------------------------------------------
+     滚动修复（桌面端）：
+     本系统有两种页面渲染路径：
+     ① 仪表盘框架路径：#app > .dashboard-v2 > .dash-main（dash-main 负责滚动）
+     ② 子页面直接替换：某些页面（编辑订单、还款、备份等）直接向 #app 注入
+        HTML，完全替换掉 .dashboard-v2，此时 html/body 的 overflow:hidden
+        导致内容超出屏幕却没有滚动条。
+     
+     修复方案：用 CSS :has() 检测当前 #app 内是否存在 .dashboard-v2。
+     • 有 .dashboard-v2 → 保持 overflow:hidden，由 .dash-main 滚动（不变）
+     • 无 .dashboard-v2 → 解除 overflow:hidden，让 html/body 正常滚动
+     
+     :has() 在 Chrome 105+、Safari 15.4+、Firefox 121+ 均已支持。
+  --------------------------------------------------------------- */
+
+  /* 子页面替换模式：#app 内没有 .dashboard-v2 时开启页面级滚动 */
+  html:not(:has(#app .dashboard-v2)) body,
+  html:not(:has(#app .dashboard-v2)) {
+    overflow: auto !important;
+    height: auto !important;
+  }
+
+  /* 子页面内容区：撑满视口，padding 留出呼吸空间 */
+  html:not(:has(#app .dashboard-v2)) #app {
+    min-height: 100vh;
     width: 100%;
-    min-width: 0;
     box-sizing: border-box;
+    padding: 12px 16px 32px;
+  }
+
+  /* 仪表盘框架模式：.dashboard-v2 存在时维持原有布局不变 */
+  html:has(#app .dashboard-v2) body,
+  html:has(#app .dashboard-v2) {
+    height: 100%;
+    overflow: hidden;
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
