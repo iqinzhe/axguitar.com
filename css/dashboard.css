@@ -310,15 +310,16 @@
   .cal-legend { display: flex; gap: 8px; align-items: center; }
   .cal-legend-item { display: flex; align-items: center; gap: 2px; font-size: 9px; color: var(--text-muted); }
 
-  .cal-table { width: 100%; text-align: center; border-collapse: collapse; }
+  /* 日历热力图：border-separate + border-spacing 制造格子间隙，避免热力色连成一片 */
+  .cal-table { width: 100%; text-align: center; border-collapse: separate; border-spacing: 2px; }
   .cal-table th { padding: 2px 0; font-weight: 600; color: var(--text-secondary); font-size: 10px; }
-  .cal-table td { padding: 1px; border: none; }
-  .cal-cell { position: relative; border-radius: 4px; transition: background 0.15s; cursor: default; }
+  .cal-table td { padding: 0; border: none; }
+  .cal-cell { position: relative; border-radius: 5px; transition: background 0.15s; cursor: default; padding: 1px 0; }
   .cal-cell.has-due { cursor: pointer; }
-  .cal-cell.has-due:hover { filter: brightness(0.93); }
+  .cal-cell.has-due:hover { filter: brightness(0.9); }
   .cal-empty { background: none !important; }
-  .cal-cell.is-today { outline: 2px solid var(--primary); outline-offset: -1px; border-radius: 4px; }
-  .cal-cell.cal-rest { background: rgba(22,163,74,0.07); }  /* 未来无业务=浅绿 */
+  .cal-cell.is-today { outline: 2px solid var(--primary); outline-offset: -1px; border-radius: 5px; }
+  .cal-cell.cal-rest { background: rgba(22,163,74,0.08); }  /* 未来无业务=浅绿 */
 
   .cal-date { display: block; font-size: 11px; color: var(--text-primary); line-height: 1.4; }
   .cal-today { font-weight: 700; color: var(--primary) !important; }
