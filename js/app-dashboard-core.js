@@ -61,7 +61,8 @@
     let _overdueInterval = null;
 
     // ========== 工作日历构建函数 ==========
-    function buildWorkCalendarHTML(dueOrders, lang, dueMap, newMap) {
+    // pawnMap：本金到期日 → 订单列表（灵活还款合同到期，需还本金）
+    function buildWorkCalendarHTML(dueOrders, lang, dueMap, newMap, pawnMap) {
         const today = Utils.getJakartaDate();
         const year = today.getUTCFullYear();
         const month = today.getUTCMonth();
@@ -81,6 +82,7 @@
 
         if (!dueMap) { dueMap = {}; dueOrders.forEach(o => { const d = o.next_interest_due_date; if (!d) return; if (!dueMap[d]) dueMap[d] = []; dueMap[d].push(o); }); }
         if (!newMap) newMap = {};
+        if (!pawnMap) pawnMap = {};
 
         // 热力图：用业务总量决定颜色深度
         const heatColor = (total) => {
@@ -103,14 +105,16 @@
                 if (day > totalDays) { row += '<td class="cal-cell cal-empty"></td>'; continue; }
 
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-                const duePending = dueMap[dateStr] || [];   // 当日到期还款
-                const newSigned  = newMap[dateStr]  || [];  // 当日新签订单
-                const dueCount   = duePending.length;
-                const newCount   = newSigned.length;
-                const total      = dueCount + newCount;
-                const isToday    = dateStr === todayStr;
-                const isPast     = dateStr < todayStr;
-                const isRestDay  = total === 0 && !isToday; // 无业务日
+                const duePending  = dueMap[dateStr]  || [];  // 当日利息到期
+                const newSigned   = newMap[dateStr]   || [];  // 当日新签订单
+                const pawnPending = pawnMap[dateStr]  || [];  // 当日本金到期（合同期满）
+                const dueCount    = duePending.length;
+                const newCount    = newSigned.length;
+                const pawnCount   = pawnPending.length;
+                const total       = dueCount + newCount + pawnCount;
+                const isToday     = dateStr === todayStr;
+                const isPast      = dateStr < todayStr;
+                const isRestDay   = total === 0 && !isToday; // 无业务日
 
                 // 背景热力色
                 const bgColor = isRestDay && isPast ? '' : heatColor(total);
@@ -125,7 +129,12 @@
 
                 if (dueCount > 0) {
                     const cls = isPast ? 'cal-badge cal-badge--due cal-overdue' : 'cal-badge cal-badge--due';
-                    cellContent += `<span class="${cls}" data-date="${dateStr}" data-type="due" title="${lang==='id'?'Jatuh tempo':'到期还款'}: ${dueCount}">💰${dueCount}</span>`;
+                    cellContent += `<span class="${cls}" data-date="${dateStr}" data-type="due" title="${lang==='id'?'Jatuh tempo bunga':'利息到期'}: ${dueCount}">💰${dueCount}</span>`;
+                }
+                if (pawnCount > 0) {
+                    // 本金到期徽章：合同期满须还本金，用不同颜色区分
+                    const pawnCls = isPast ? 'cal-badge cal-badge--pawn cal-overdue-pawn' : 'cal-badge cal-badge--pawn';
+                    cellContent += `<span class="${pawnCls}" data-date="${dateStr}" data-type="pawn" title="${lang==='id'?'Jatuh tempo pokok':'本金到期'}: ${pawnCount}">🏦${pawnCount}</span>`;
                 }
                 if (newCount > 0) {
                     cellContent += `<span class="cal-badge cal-badge--new" data-date="${dateStr}" data-type="new" title="${lang==='id'?'Baru':'新签'}: ${newCount}">🆕${newCount}</span>`;
@@ -149,7 +158,8 @@
                 <div class="calendar-header">
                     <span>${month_str} ${year_str}</span>
                     <span class="cal-legend">
-                        <span class="cal-legend-item"><span class="cal-badge cal-badge--due">💰</span>${lang==='id'?'Jatuh Tempo':'到期还款'}</span>
+                        <span class="cal-legend-item"><span class="cal-badge cal-badge--due">💰</span>${lang==='id'?'Bunga Jatuh Tempo':'利息到期'}</span>
+                        <span class="cal-legend-item"><span class="cal-badge cal-badge--pawn">🏦</span>${lang==='id'?'Pokok Jatuh Tempo':'本金到期'}</span>
                         <span class="cal-legend-item"><span class="cal-badge cal-badge--new">🆕</span>${lang==='id'?'Order Baru':'新签订单'}</span>
                         <span class="cal-legend-item"><span class="cal-rest-dot">●</span>${lang==='id'?'Tenang':'可休息'}</span>
                     </span>
@@ -704,14 +714,25 @@
                                 const month = today.getMonth();
                                 const monthStart = `${year}-${String(month+1).padStart(2,'0')}-01`;
                                 const monthEnd = `${year}-${String(month+1).padStart(2,'0')}-${String(new Date(year, month+1, 0).getDate()).padStart(2,'0')}`;
-                                // 本月到期订单（active状态，整月范围）
+                                // 本月利息到期订单（next_interest_due_date 落在本月内）
                                 const rDue = await applyFilter(
                                     client.from('orders')
-                                        .select('order_id, customer_name, next_interest_due_date, loan_amount, status, custom_order_date, created_at')
+                                        .select('order_id, customer_name, next_interest_due_date, pawn_due_date, loan_amount, status, custom_order_date, created_at, repayment_type')
                                         .eq('status', 'active')
                                         .gte('next_interest_due_date', monthStart)
                                         .lte('next_interest_due_date', monthEnd)
                                         .not('next_interest_due_date', 'is', null)
+                                );
+                                // 本月本金到期订单（pawn_due_date 落在本月内，且未在利息到期中重复）
+                                // 单独查询，与利息到期分开显示，使门店同时掌握两类到期信息
+                                const rPawn = await applyFilter(
+                                    client.from('orders')
+                                        .select('order_id, customer_name, pawn_due_date, loan_amount, status, custom_order_date, created_at, repayment_type')
+                                        .eq('status', 'active')
+                                        .eq('repayment_type', 'flexible')
+                                        .gte('pawn_due_date', monthStart)
+                                        .lte('pawn_due_date', monthEnd)
+                                        .not('pawn_due_date', 'is', null)
                                 );
                                 // 本月新签订单（所有状态）
                                 const rNew = await applyFilter(
@@ -722,12 +743,13 @@
                                 );
                                 return {
                                     dueOrders: rDue.data || [],
+                                    pawnDueOrders: rPawn.data || [],
                                     newOrders: (rNew.data || []).map(o => ({
                                         ...o,
                                         _signDate: o.custom_order_date || (o.created_at || '').substring(0, 10)
                                     }))
                                 };
-                            } catch (e) { return { dueOrders: [], newOrders: [] }; }
+                            } catch (e) { return { dueOrders: [], pawnDueOrders: [], newOrders: [] }; }
                         })()
                     ]);
 
@@ -776,6 +798,7 @@
                             return diff >= 0 && diff <= 7 * 86400000;
                         }) : (Array.isArray(dueOrdersRes) ? dueOrdersRes : []),
                         calendar_due: (dueOrdersRes && dueOrdersRes.dueOrders) ? dueOrdersRes.dueOrders : [],
+                        calendar_pawn_due: (dueOrdersRes && dueOrdersRes.pawnDueOrders) ? dueOrdersRes.pawnDueOrders : [],
                         calendar_new: (dueOrdersRes && dueOrdersRes.newOrders) ? dueOrdersRes.newOrders : []
                     };
                 }, { ttl: 10 * 60 * 1000 });
@@ -850,14 +873,18 @@
                 const dueOrders = kpiReport.due_orders || [];
                 const calDueOrders = kpiReport.calendar_due || dueOrders;
                 const calNewOrders = kpiReport.calendar_new || [];
-                // 构建到期日 Map
+                const calPawnDueOrders = kpiReport.calendar_pawn_due || [];
+                // 构建利息到期日 Map（每月滚动）
                 const dueMap = {};
                 calDueOrders.forEach(o => { const d = o.next_interest_due_date; if (!d) return; if (!dueMap[d]) dueMap[d] = []; dueMap[d].push(o); });
+                // 构建本金到期日 Map（灵活还款合同到期）
+                const pawnMap = {};
+                calPawnDueOrders.forEach(o => { const d = o.pawn_due_date; if (!d) return; if (!pawnMap[d]) pawnMap[d] = []; pawnMap[d].push(o); });
                 // 构建新签 Map
                 const newMap = {};
                 calNewOrders.forEach(o => { const d = o._signDate; if (!d) return; if (!newMap[d]) newMap[d] = []; newMap[d].push(o); });
 
-                const calendarHTML = buildWorkCalendarHTML(calDueOrders, lang, dueMap, newMap);
+                const calendarHTML = buildWorkCalendarHTML(calDueOrders, lang, dueMap, newMap, pawnMap);
 
                 const kpiRowHTML = `
 <div class="kpi-row kpi-row--calendar">
@@ -984,8 +1011,9 @@
                         e.stopPropagation();
                         const date = target.dataset.date;
                         const type = target.dataset.type; // 'due' or 'new'
-                        const dueList  = dueMap[date] || [];
-                        const newList  = newMap[date]  || [];
+                        const dueList  = dueMap[date]  || [];
+                        const newList  = newMap[date]   || [];
+                        const pawnList = pawnMap[date]  || [];
                         const lang = Utils.lang;
 
                         const oldPopup = document.getElementById('calPopup');
@@ -993,11 +1021,13 @@
 
                         const renderOrderCard = (o, kind) => {
                             const safeId = Utils.escapeAttr(o.order_id);
-                            const icon = kind === 'due' ? '💰' : '🆕';
-                            const labelCls = kind === 'due' ? 'cal-popup-badge--due' : 'cal-popup-badge--new';
-                            const label = kind === 'due'
-                                ? (lang === 'id' ? 'Jatuh Tempo' : '到期还款')
-                                : (lang === 'id' ? 'Order Baru' : '新签订单');
+                            const icon     = kind === 'due' ? '💰' : kind === 'pawn' ? '🏦' : '🆕';
+                            const labelCls = kind === 'due' ? 'cal-popup-badge--due' : kind === 'pawn' ? 'cal-popup-badge--pawn' : 'cal-popup-badge--new';
+                            const label    = kind === 'due'
+                                ? (lang === 'id' ? 'Bunga Jatuh Tempo' : '利息到期')
+                                : kind === 'pawn'
+                                    ? (lang === 'id' ? 'Pokok Jatuh Tempo' : '本金到期')
+                                    : (lang === 'id' ? 'Order Baru' : '新签订单');
                             const amount = o.loan_amount ? Utils.formatCurrency(o.loan_amount) : '-';
                             return `<div class="cal-popup-card" onclick="JF.DashboardCore.navigateTo('viewOrder',{orderId:'${safeId}'}); document.getElementById('calPopup')?.remove();">
                                 <div class="cal-popup-card-top">
@@ -1011,8 +1041,12 @@
 
                         let cardsHtml = '';
                         if (dueList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title">💰 ${lang==='id'?'Jatuh Tempo':'到期还款'} (${dueList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title">💰 ${lang==='id'?'Bunga Jatuh Tempo':'利息到期'} (${dueList.length})</div>`;
                             dueList.forEach(o => cardsHtml += renderOrderCard(o, 'due'));
+                        }
+                        if (pawnList.length > 0) {
+                            cardsHtml += `<div class="cal-popup-section-title">🏦 ${lang==='id'?'Pokok Jatuh Tempo':'本金到期（合同期满）'} (${pawnList.length})</div>`;
+                            pawnList.forEach(o => cardsHtml += renderOrderCard(o, 'pawn'));
                         }
                         if (newList.length > 0) {
                             cardsHtml += `<div class="cal-popup-section-title">🆕 ${lang==='id'?'Order Baru':'新签订单'} (${newList.length})</div>`;

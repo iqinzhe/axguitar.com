@@ -1397,6 +1397,13 @@
                     created_at: orderDate + 'T00:00:00.000Z',
                     updated_at: new Date().toISOString()
                 };
+                // 同步重算 pawn_due_date：订单日期或典当期限变更时，本金到期日必须随之更新。
+                // 否则本金到期提醒和催收判断仍基于旧日期，与 next_interest_due_date 的修复不一致。
+                if (repayType === 'flexible' && pawnTerm && pawnTerm > 0) {
+                    updates.pawn_due_date = Utils.calculatePawnDueDate(orderDate, pawnTerm);
+                } else if (repayType !== 'flexible') {
+                    updates.pawn_due_date = null;
+                }
                 var client = SUPABASE.getClient();
                 var res = await client.from('orders').update(updates).eq('order_id', orderId);
                 if (res.error) throw res.error;

@@ -244,6 +244,9 @@
                 }
 
                 const nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
+                // 本金到期日：灵活还款有合同期限时显示，提醒门店本金归还截止日
+                const pawnDueDateStr = (order.repayment_type === 'flexible' && order.pawn_due_date)
+                    ? Utils.formatDate(order.pawn_due_date) : null;
                 const nextInterestNumber = interestPayments.length + 1;
 
                 // 固定还款部分（保持不变）
@@ -451,7 +454,8 @@
                             <div class="summary-item"><span class="label">${t('remaining_principal')}:</span><span class="value ${remainingPrincipal > 0 ? 'warning' : 'success-text'}">${Utils.formatCurrency(remainingPrincipal)}</span></div>
                             <div class="summary-item"><span class="label">${t('interest')}:</span><span class="value">${Utils.formatCurrency(currentMonthlyInterest)}</span></div>
                             <div class="summary-item"><span class="label">${t('payment_due_date')}:</span><span class="value">${nextDueDate}</span></div>
-                            <div class="summary-item"><span class="label">${t('repayment_type')}:</span><span class="value">${order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')}${order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + t('month') + ')' : ''}</span></div>
+                            ${pawnDueDateStr ? `<div class="summary-item"><span class="label">🏦 ${lang==='id'?'Jatuh Tempo Pokok':'本金到期日'}:</span><span class="value" style="color:${order.pawn_due_date < Utils.getLocalToday() ? '#c2410c' : 'inherit'};font-weight:${order.pawn_due_date < Utils.getLocalToday() ? '700' : 'normal'}">${pawnDueDateStr}${order.pawn_due_date < Utils.getLocalToday() ? ' ⚠️' : ''}</span></div>` : ''}
+                            <div class="summary-item"><span class="label">${t('repayment_type')}:</span><span class="value">${order.repayment_type === 'fixed' ? '📅 ' + t('fixed_repayment') : '💰 ' + t('flexible_repayment')}${order.repayment_type === 'fixed' ? ' (' + order.repayment_term + ' ' + t('month') + ')' : (order.pawn_term_months ? ' (' + order.pawn_term_months + ' ' + (lang==='id'?'bln':'个月') + ')' : '')}</span></div>
                             <div class="summary-item"><span class="label">💎 ${t('collateral_name')}:</span><span class="value">${Utils.escapeHtml(order.collateral_name || '-')}</span></div>
                             <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%) — <span class="income">${serviceFeePaidInfo}</span></span></div>
                             <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)} — <span class="income">${adminFeePaidInfo}</span></span></div>

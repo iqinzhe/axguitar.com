@@ -1125,9 +1125,12 @@
                             Utils.roundMonthlyPayment(Utils.calculateFixedMonthlyPayment(orderData.loan_amount, agreedInterestRate, repaymentTerm));
                     }
                     const monthlyInterest = orderData.loan_amount * agreedInterestRate;
-                    const nextDueDate = (repaymentType === 'flexible' && pawnDueDate) 
-                        ? pawnDueDate 
-                        : this.calculateNextDueDate(nowDate, 0);
+                    // 核心修复：next_interest_due_date 永远是"开单日+1个月"（第一期利息到期日）。
+                    // 原来灵活还款有典当期限时，错误地将 pawn_due_date（本金最终到期日）赋给
+                    // next_interest_due_date，导致2-3个月内没有月度利息提醒，也不触发逾期，
+                    // 门店无事可做，客户攒够几个月利息一次性还才被催。
+                    // pawn_due_date 单独保存，仅用于本金到期提醒，与利息月度跟踪完全分离。
+                    const nextDueDate = this.calculateNextDueDate(nowDate, 0);
                     const newOrderData = {
                         order_id: orderId, customer_name: orderData.customer_name,
                         customer_ktp: orderData.customer_ktp, customer_phone: orderData.customer_phone,
@@ -1771,7 +1774,7 @@
             if(!supabaseClient) return false;
             const { data: activeOrders, error } = await supabaseClient
                 .from('orders')
-                .select('id, next_interest_due_date, overdue_days, liquidation_status, fund_status, created_at')
+                .select('id, next_interest_due_date, pawn_due_date, overdue_days, liquidation_status, fund_status, created_at, repayment_type')
                 .eq('status', 'active');
             if(error) throw error;
             if(!activeOrders?.length) return true;
@@ -1784,6 +1787,7 @@
             for(const o of activeOrders){
                 if(!o.next_interest_due_date) continue;
                 
+                // 利息逾期：基于 next_interest_due_date（每月滚动）
                 const dueDateStr = o.next_interest_due_date;
                 const [year, month, day] = dueDateStr.split('-').map(Number);
                 const dueJakarta = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
@@ -1792,6 +1796,19 @@
                 let overdue = 0;
                 if(todayTime > dueTime) {
                     overdue = Math.floor((todayTime - dueTime) / 86400000);
+                }
+
+                // 本金到期补充判断：灵活还款有 pawn_due_date 时，
+                // 若今日已超过本金到期日，且利息逾期天数不足以触发催收，则以本金逾期天数为准。
+                // 这样门店能在本金到期后立即看到催收提醒，而不用等利息逾期计数爬升。
+                if(o.repayment_type === 'flexible' && o.pawn_due_date) {
+                    const [py, pm, pd] = o.pawn_due_date.split('-').map(Number);
+                    const pawnTime = new Date(Date.UTC(py, pm - 1, pd, 0, 0, 0)).getTime();
+                    if(todayTime > pawnTime) {
+                        const principalOverdue = Math.floor((todayTime - pawnTime) / 86400000);
+                        // 取利息逾期天数和本金逾期天数中较大者，确保催收力度足够
+                        overdue = Math.max(overdue, principalOverdue);
+                    }
                 }
                 
                 let status = o.liquidation_status||'normal';
@@ -2409,13 +2426,28 @@
         // 仍用旧到期日计算逾期天数，仪表盘持续显示错误的逾期状态。
         const newNextDueDate = Utils.calculateNextDueDate(effectiveOrderDate, interestMonths);
 
-        // BUG修复：基于新到期日立即重算逾期天数和逾期状态，不等定时器（每18分钟才触发）
+        // 同步重算 pawn_due_date：管理员修改订单日期或典当期限时，本金到期日也必须随之更新。
+        // 若订单没有 pawn_term_months 则 pawn_due_date 保持 null。
+        const newPawnDueDate = (orderRow.repayment_type === 'flexible' && orderRow.pawn_term_months)
+            ? Utils.calculatePawnDueDate(effectiveOrderDate, orderRow.pawn_term_months)
+            : orderRow.pawn_due_date || null;
+
+        // 基于新到期日立即重算逾期天数和逾期状态，不等定时器（每18分钟才触发）
         const todayJakarta = Utils.getJakartaDate ? Utils.getJakartaDate() : new Date();
         todayJakarta.setUTCHours(0, 0, 0, 0);
         const todayTime = todayJakarta.getTime();
         const [dyear, dmonth, dday] = newNextDueDate.split('-').map(Number);
-        const dueTime = new Date(Date.UTC(dyear, dmonth - 1, dday, 0, 0, 0)).getTime();
-        const newOverdueDays = todayTime > dueTime ? Math.floor((todayTime - dueTime) / 86400000) : 0;
+        const interestDueTime = new Date(Date.UTC(dyear, dmonth - 1, dday, 0, 0, 0)).getTime();
+        let newOverdueDays = todayTime > interestDueTime ? Math.floor((todayTime - interestDueTime) / 86400000) : 0;
+        // 同时检查本金到期：若本金已过期，取两者较大值
+        if (newPawnDueDate && orderRow.repayment_type === 'flexible') {
+            const [py, pm, pd] = newPawnDueDate.split('-').map(Number);
+            const pawnDueTime = new Date(Date.UTC(py, pm - 1, pd, 0, 0, 0)).getTime();
+            if (todayTime > pawnDueTime) {
+                const principalOverdue = Math.floor((todayTime - pawnDueTime) / 86400000);
+                newOverdueDays = Math.max(newOverdueDays, principalOverdue);
+            }
+        }
         let newLiqStatus = 'normal';
         let newFundStatus = orderRow.fund_status;
         if (newStatus === 'active') {
@@ -2433,6 +2465,7 @@
             monthly_interest:       monthlyInterest,
             status:                 newStatus,
             next_interest_due_date: newNextDueDate,
+            pawn_due_date:          newPawnDueDate,
             overdue_days:           newOverdueDays,
             liquidation_status:     newLiqStatus,
             fund_status:            newFundStatus,
