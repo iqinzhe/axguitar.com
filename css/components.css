@@ -954,7 +954,7 @@
     border: 1px solid var(--border-medium);
   }
   .login-box .login-title {
-    font-size: 1.5rem;
+    font-size: var(--font-2xl);
     margin-bottom: 28px;
     text-align: center;
     display: flex;
@@ -964,7 +964,7 @@
     color: var(--text-primary);
   }
   .login-note {
-    font-size: 0.7rem;
+    font-size: var(--font-sm);
     color: #64748b;
     margin-top: 12px;
     text-align: center;
@@ -1858,7 +1858,7 @@
     margin-top: 4px;
 }
 .jf-page-info {
-    font-size: 12px;
+    font-size: var(--font-xs);
     color: var(--text-muted);
     margin-right: 4px;
     white-space: nowrap;
@@ -1877,7 +1877,7 @@
     border-radius: 6px;
     background: var(--white);
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: var(--font-sm);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
     line-height: 1;
@@ -1900,11 +1900,11 @@
 }
 .jf-page-nav {
     padding: 0 12px;
-    font-size: 12px;
+    font-size: var(--font-xs);
     white-space: nowrap;
 }
 .jf-page-ellipsis {
-    font-size: 13px;
+    font-size: var(--font-sm);
     color: var(--text-muted);
     padding: 0 2px;
     line-height: 32px;
@@ -1914,13 +1914,13 @@
     padding: 0 6px;
     border: 1px solid var(--gray-200);
     border-radius: 6px;
-    font-size: 12px;
+    font-size: var(--font-xs);
     background: var(--white);
     color: var(--text-primary);
     cursor: pointer;
     margin-left: 8px;
 }
 .jf-page-size-label {
-    font-size: 12px;
+    font-size: var(--font-xs);
     color: var(--text-muted);
 }

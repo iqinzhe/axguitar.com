@@ -1,68 +1,108 @@
 /* ============================================================
-   responsive.css - 统一响应式与打印样式（已适配布局调整）
+   responsive.css - 统一响应式与打印样式
+   目标设备：
+     桌面端：15.6" 笔记本（1366×768 ~ 1920×1080）
+     手机端：三星 A36（1080×2408 px，逻辑尺寸 ~360×802 dp，3x DPR）
+   字体规则：
+     桌面 html = 16px → 变量比例尺正常换算
+     手机 html = 15px → 变量比例尺稍小，确保可读
    ============================================================ */
 
 /* ============================================================
-   一、桌面端微调（≥769px）
+   一、桌面端（≥ 769px）—— 针对 15.6" 笔记本优化
    ============================================================ */
 @media (min-width: 769px) {
-    html { font-size: 17px; }
+    /* 基础字号：16px → 变量 --font-* 按比例换算为正常大小 */
+    html { font-size: 16px; }
 
-    #app { padding: var(--spacing-3) var(--spacing-4); }
+    body {
+        line-height: var(--leading-normal);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
 
-    .page-header h1,
-    .page-header h2 { font-size: var(--font-xl); }
+    /* --- 页面标题层级 --- */
+    .page-header h1    { font-size: var(--font-2xl);  font-weight: 700; letter-spacing: -0.02em; }
+    .page-header h2    { font-size: var(--font-xl);   font-weight: 600; }
+    .page-header p,
+    .page-header .desc { font-size: var(--font-sm);   color: var(--text-muted); }
 
-    .card h3 { font-size: var(--font-md); }
+    /* --- 卡片标题 --- */
+    .card h3,
+    .card-title,
+    .card-header .card-title { font-size: var(--font-md); font-weight: 700; }
 
-    .card--stat .stat-value { font-size: var(--font-lg); }
-    .card--stat .stat-label { font-size: var(--font-xs); }
+    /* --- 统计卡片数值 --- */
+    .card--stat .stat-value   { font-size: var(--font-xl);  font-weight: 800; }
+    .card--stat .stat-label   { font-size: var(--font-xs);  font-weight: 500; }
 
-    .data-table thead th,
-    .data-table tbody td { font-size: var(--font-sm); }
+    /* --- 表格 --- */
+    .data-table thead th      { font-size: var(--font-xs);  font-weight: 700; }
+    .data-table tbody td      { font-size: var(--font-sm); }
 
-    .btn { font-size: var(--font-sm); }
-    .btn--sm { font-size: var(--font-sm); }
-
+    /* --- 按钮 --- */
+    .btn        { font-size: var(--font-sm); padding: 8px 16px; }
+    .btn--sm    { font-size: var(--font-xs); padding: 5px 12px; }
     .toolbar .btn { font-size: var(--font-sm); }
 
-    .form-group label { font-size: var(--font-sm); }
-
+    /* --- 表单 --- */
+    .form-group label     { font-size: var(--font-sm);  font-weight: 600; }
     .form-group input,
     .form-group select,
-    .form-group textarea { font-size: var(--font-md); }
+    .form-group textarea  { font-size: var(--font-md); }
 
-    .table-container { overflow-x: visible; }
-
+    /* --- 桌面端表格不横滚 --- */
+    .table-container    { overflow-x: visible; }
     .data-table {
         table-layout: auto !important;
         min-width: auto !important;
         width: 100%;
     }
 
-    /* 收益处置卡片：桌面端三列 */
+    /* --- 收益处置卡片：桌面三列 --- */
     .profit-distribution-grid {
         display: grid !important;
         grid-template-columns: repeat(3, 1fr);
         gap: var(--spacing-3);
         align-items: stretch;
     }
+
+    /* --- 应用容器内边距 --- */
+    #app { padding: var(--spacing-3) var(--spacing-4); }
 }
 
 /* ============================================================
-   二、手机端响应式（≤768px）
+   二、手机端（≤ 768px）—— 针对三星 A36（360dp 逻辑宽度）
    ============================================================ */
 @media (max-width: 768px) {
-    html { font-size: 16px; }
+    /* 基础字号：15px → 舒适可读，不过小 */
+    html { font-size: 15px; }
+
+    body {
+        line-height: var(--leading-relaxed);
+        -webkit-font-smoothing: antialiased;
+        -webkit-text-size-adjust: 100%;
+    }
 
     #app { padding: var(--spacing-2); }
 
+    /* --- 页面标题 --- */
     .page-header h1,
-    .page-header h2 { font-size: var(--font-lg); }
+    .page-header h2 { font-size: var(--font-xl); font-weight: 700; }
 
-    .card h3 { font-size: calc(var(--font-md) - 0.0625rem); }
+    /* --- 卡片标题（统一，层级清晰） --- */
+    .card h3,
+    .card-header .card-title,
+    .modal-content h3,
+    .repayment-card-title,
+    .anomaly-card-header h3,
+    .backup-card h3 {
+        font-size: var(--font-md);   /* 15px */
+        font-weight: 700;
+        margin-bottom: var(--spacing-2);
+    }
 
-    /* 统计卡片：保持 2 列 */
+    /* --- 统计卡片：保持 2 列 --- */
     .stats-grid,
     .stats-grid.stats-grid--2,
     .stats-grid.stats-grid--3,
@@ -72,18 +112,186 @@
     }
 
     .card--stat {
-        min-height: 64px;
+        min-height: 68px;
         padding: var(--spacing-2) var(--spacing-3);
     }
 
-    .card--stat .stat-value { font-size: calc(var(--font-xl) - 0.125rem); }
-    .card--stat .stat-label { font-size: calc(var(--font-xs) - 0.03125rem); }
+    /* 统计数值：显著、可读 */
+    .card--stat .stat-value,
+    .stat-value,
+    .kpi-val,
+    .fund-block-val,
+    .info-item-value,
+    .cashflow-item-card .value,
+    .repayment-card .repayment-amount,
+    .amount-highlight,
+    .card .card-value-main,
+    .legend-count {
+        font-size: var(--font-lg);   /* 1.125rem ≈ 17px */
+        font-weight: 700;
+    }
 
-    /* 信息卡片：堆叠 */
+    /* 统计标签：清晰可辨 */
+    .card--stat .stat-label { font-size: var(--font-xs); font-weight: 500; }
+
+    /* --- 辅助文字（标签类、说明类） --- */
+    .stat-label,
+    .card-action,
+    .info-label,
+    .repayment-card-desc,
+    .repayment-card-note,
+    .card .info-bar,
+    .card .form-hint,
+    .cashflow-item-card .label,
+    .legend-name,
+    .legend-pct,
+    .kpi-label,
+    .fund-block-label,
+    .cb-label,
+    .income-name,
+    .income-sub,
+    .info-item-card .info-item-detail,
+    .card .card-history .history-title,
+    .anomaly-badge,
+    .util-bar-label,
+    .np-label,
+    .np-sub,
+    .quick-btn .qb-label,
+    .order-status-card .legend-name {
+        font-size: var(--font-xs);   /* 0.75rem ≈ 11px */
+    }
+
+    /* 描述性文字 */
+    .card p,
+    .card .desc-text,
+    .repayment-card-desc,
+    .info-bar-content,
+    .card .text-muted {
+        font-size: var(--font-sm);   /* 0.875rem ≈ 13px */
+    }
+
+    /* --- 表格 --- */
+    .table-container {
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        margin: var(--spacing-2) 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+        font-size: var(--font-xs);   /* 0.75rem ≈ 11px */
+        table-layout: fixed;
+        min-width: 680px;
+        width: max-content;
+    }
+
+    .data-table thead th,
+    .data-table tbody td {
+        padding: 8px 6px;
+        font-size: var(--font-xs);
+        line-height: var(--leading-tight);
+        height: auto;
+        min-height: 36px;
+        white-space: nowrap;
+    }
+
+    .data-table thead th { font-weight: 700; }
+
+    .data-table .desc-cell {
+        white-space: normal;
+        word-break: break-word;
+        min-width: 120px;
+        max-width: 160px;
+    }
+
+    /* --- 按钮 --- */
+    .btn {
+        font-size: var(--font-sm);   /* 0.875rem ≈ 13px */
+        padding: 9px 14px;
+        border-radius: var(--radius-md);
+    }
+    .btn--sm {
+        font-size: var(--font-xs);   /* 0.75rem ≈ 11px */
+        padding: 7px 12px;
+        border-radius: var(--radius-sm);
+    }
+
+    .toolbar .btn {
+        font-size: var(--font-xs);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: var(--spacing-2) var(--spacing-2);
+    }
+
+    /* 提交类按钮全宽 */
+    .btn--primary,
+    .btn--success,
+    .btn--warning,
+    .btn--danger,
+    .btn--outline {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* --- 徽章 --- */
+    .badge {
+        font-size: var(--font-2xs);  /* 0.64rem ≈ 10px */
+        padding: 2px 7px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-weight: 600;
+    }
+
+    .locked-badge,
+    .reconciled-badge {
+        font-size: var(--font-2xs);
+        padding: 2px 8px;
+    }
+
+    /* --- 操作行 --- */
+    .action-row td { padding: 7px 6px !important; }
+
+    .action-row .action-label {
+        font-size: var(--font-xs);
+        width: 40px;
+        min-width: 40px;
+        padding-right: var(--spacing-1);
+    }
+
+    .action-row .action-buttons {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 10px;
+        align-items: center;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 2px 0;
+    }
+
+    .action-row .action-buttons .btn--sm {
+        flex-shrink: 0;
+        white-space: nowrap;
+        padding: 7px 12px;
+        font-size: var(--font-xs);
+        border-radius: var(--radius-sm);
+        line-height: var(--leading-tight);
+        min-width: auto;
+        width: auto;
+        max-width: 120px;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .store-table .action-buttons .btn--sm {
+        padding: 6px 10px;
+    }
+
+    /* --- 布局调整 --- */
     .info-cards-row { flex-direction: column; }
     .info-cards-row .info-item-card { min-width: auto; }
 
-    /* 费用卡片：堆叠 */
     .fee-cards-row {
         grid-template-columns: 1fr;
         gap: var(--spacing-3);
@@ -98,120 +306,6 @@
     .fee-card .fee-card-body select { width: 100%; min-width: auto; }
     .fee-card .fee-card-body input  { width: 100%; text-align: right; }
 
-    /* 按钮 - 统一缩小，全宽 */
-    .btn {
-        font-size: var(--font-xs);
-        padding: 8px 14px;
-    }
-    .btn--sm {
-        padding: 6px 12px;
-        font-size: 11px;
-    }
-
-    .toolbar .btn {
-        font-size: var(--font-xs);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        padding: var(--spacing-3) var(--spacing-1);
-    }
-
-    /* 提交类按钮在移动端全宽 */
-    .btn--primary,
-    .btn--success,
-    .btn--warning,
-    .btn--danger,
-    .btn--outline {
-        width: 100%;
-        text-align: center;
-    }
-
-    /* 表格：水平滚动 */
-    .table-container {
-        border: 1px solid var(--border-light);
-        border-radius: var(--radius-md);
-        margin: var(--spacing-2) 0;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .data-table {
-        font-size: var(--font-xs);
-        table-layout: fixed;
-        min-width: 700px;
-        width: max-content;
-    }
-
-    .data-table thead th,
-    .data-table tbody td {
-        padding: 6px 5px;
-        font-size: var(--font-xs);
-        line-height: 1.3;
-        height: auto;
-        min-height: 32px;
-        white-space: nowrap;
-    }
-
-    .data-table .desc-cell {
-        white-space: normal;
-        word-break: break-word;
-        min-width: 120px;
-        max-width: 160px;
-    }
-
-    /* 操作行按钮 */
-    .action-row td { padding: 6px 5px !important; }
-
-    .action-row .action-label {
-        font-size: var(--font-xs);
-        width: 40px;
-        min-width: 40px;
-        padding-right: var(--spacing-1);
-    }
-
-    .action-row .action-buttons {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        gap: 12px;
-        align-items: center;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding: 2px 0;
-    }
-
-    .action-row .action-buttons .btn--sm {
-        flex-shrink: 0;
-        white-space: nowrap;
-        padding: 8px 14px;
-        font-size: 11px;
-        border-radius: var(--radius-sm);
-        line-height: 1.3;
-        min-width: auto;
-        width: auto;
-        max-width: 120px;
-        text-align: center;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .store-table .action-buttons .btn--sm {
-        padding: 6px 10px;
-        font-size: 10px;
-    }
-
-    /* 徽章缩小 */
-    .badge {
-        font-size: 10px;
-        padding: 1px 6px;
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-
-    .locked-badge,
-    .reconciled-badge {
-        font-size: 10px;
-        padding: 2px 8px;
-    }
-
     /* 工具栏：2列 */
     .toolbar.admin-grid,
     .toolbar.store-grid { grid-template-columns: repeat(2, 1fr); }
@@ -219,15 +313,15 @@
     /* 摘要网格：2列 */
     .summary-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: var(--spacing-1);
+        gap: var(--spacing-2);
     }
 
     .summary-item {
-        padding: var(--spacing-1);
+        padding: var(--spacing-2);
         gap: var(--spacing-1);
     }
 
-    .summary-item .label { font-size: var(--font-xs); }
+    .summary-item .label { font-size: var(--font-xs); font-weight: 600; }
     .summary-item .value { font-size: var(--font-xs); }
 
     /* 缴费双列：单列 */
@@ -269,11 +363,11 @@
 
     .interest-rate-group { max-width: none; }
 
-    .form-group label { font-size: var(--font-xs); }
+    .form-group label { font-size: var(--font-sm); font-weight: 600; }
 
     .form-group input,
     .form-group select,
-    .form-group textarea { font-size: var(--font-sm); }
+    .form-group textarea { font-size: var(--font-md); }  /* 保持 16px 防止 iOS 缩放 */
 
     /* 订单详情 */
     .order-detail-grid {
@@ -312,111 +406,45 @@
         overflow-x: auto;
     }
 
-    /* 卡片内部文字统一缩小（移动端比桌面小一号） */
-    .card h3,
-    .card-header .card-title,
-    .modal-content h3,
-    .repayment-card-title,
-    .anomaly-card-header h3,
-    .backup-card h3 {
-        font-size: calc(var(--font-md) - 0.0625rem);
-        margin-bottom: var(--spacing-1);
-    }
-
-    .stat-value,
-    .kpi-val,
-    .fund-block-val,
-    .info-item-value,
-    .cashflow-item-card .value,
-    .repayment-card .repayment-amount,
-    .fee-card .fee-card-body input,
-    .amount-highlight,
-    .card .card-value-main,
-    .summary-item .value,
-    .legend-count {
-        font-size: calc(var(--font-lg) - 0.0625rem);
-    }
-
-    .stat-label,
-    .card-action,
-    .info-label,
-    .repayment-card-desc,
-    .repayment-card-note,
-    .card .info-bar,
-    .card .form-hint,
-    .cashflow-item-card .label,
-    .legend-name,
-    .legend-pct,
-    .kpi-label,
-    .fund-block-label,
-    .cb-label,
-    .income-name,
-    .income-sub,
-    .info-item-card .info-item-detail,
-    .card .card-history .history-title,
-    .anomaly-badge,
-    .util-bar-label,
-    .np-label,
-    .np-sub,
-    .quick-btn .qb-label,
-    .order-status-card .legend-name {
-        font-size: calc(var(--font-xs) - 0.03125rem);
-    }
-
-    .card p,
-    .card .desc-text,
-    .repayment-card-desc,
-    .info-bar-content,
-    .card .text-muted {
-        font-size: calc(var(--font-sm) - 0.0625rem);
-    }
-
     /* 收益处置卡片：移动端单列 */
     .profit-distribution-grid {
         display: block !important;
     }
 
-    /* ===== 手机端隐藏以下元素（仅为移动端）===== */
-    /* 1. 隐藏“活跃在押订单”卡片（KPI 第二个卡片） */
-    .kpi-card--green {
-        display: none !important;
-    }
-    /* 2. 隐藏“订单状态分布”卡片 */
-    .order-status-card {
-        display: none !important;
-    }
+    /* 手机端隐藏以下元素 */
+    .kpi-card--green     { display: none !important; }
+    .order-status-card   { display: none !important; }
 }
 
 /* ============================================================
-   三、小屏手机额外适配（≤480px）
+   三、小屏手机额外适配（≤ 400px）—— 适配 A36 最小安全宽度
    ============================================================ */
-@media (max-width: 480px) {
-    .stats-grid {
-        gap: 8px;
-    }
-    .summary-grid {
-        grid-template-columns: 1fr;
-    }
-    .btn {
-        width: 100%;
-    }
+@media (max-width: 400px) {
+    html { font-size: 14px; }
+
+    .stats-grid { gap: 6px; }
+
+    .summary-grid { grid-template-columns: 1fr; }
+
+    .btn { width: 100%; }
+
     .btn--sm {
-        font-size: 10px;
+        font-size: var(--font-2xs);
         padding: 6px 10px;
     }
+
+    .card--stat .stat-value { font-size: var(--font-md); }
 }
 
 /* ============================================================
-   四、打印样式（全系统统一 — 已合并三处 @media print，@page 唯一）
+   四、打印样式
    ============================================================ */
 @media print {
-    /* ------ 页面设置（唯一 @page，竖向 A4，统一边距） ------ */
     @page {
         size: A4 portrait;
         margin: 10mm 8mm;
     }
 
-    /* ------ 全局 ------ */
     body {
         background: #fff !important;
         color: #000 !important;
@@ -431,7 +459,6 @@
         margin: 0 !important;
     }
 
-    /* ------ 隐藏非打印元素 ------ */
     .no-print,
     .toolbar,
     .action-buttons,
@@ -440,24 +467,14 @@
     .form-actions,
     .lang-toggle,
     .print-stamp,
-    .watermark {
-        display: none !important;
-    }
+    .watermark { display: none !important; }
 
     .print-only { display: block !important; }
 
-    a {
-        color: #000 !important;
-        text-decoration: none !important;
-    }
+    a { color: #000 !important; text-decoration: none !important; }
 
-    /* ------ 打印容器（无额外内边距） ------ */
-    .print-container {
-        margin: 0;
-        padding: 0;
-    }
+    .print-container { margin: 0; padding: 0; }
 
-    /* ------ 卡片 ------ */
     .card,
     .cashflow-summary,
     .kpi-card,
@@ -486,11 +503,7 @@
     .page-header h1,
     .page-header h2 { text-align: left !important; }
 
-    /* ------ 表格 ------ */
-    .table-container {
-        border: none;
-        overflow: visible;
-    }
+    .table-container { border: none; overflow: visible; }
 
     .data-table,
     .anomaly-table {
@@ -514,13 +527,8 @@
         word-break: break-word !important;
     }
 
-    /* ------ 徽章 ------ */
-    .badge {
-        border: 1px solid #999 !important;
-        background: none !important;
-    }
+    .badge { border: 1px solid #999 !important; background: none !important; }
 
-    /* ------ 描述列 ------ */
     .data-table .desc-cell,
     .cashflow-table .flow-desc,
     .capital-table .flow-desc,
@@ -532,12 +540,7 @@
         word-break: break-word !important;
     }
 
-    /* ------ 统计卡片 ------ */
-    .stats-grid {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 6px !important;
-    }
+    .stats-grid { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; }
 
     .card--stat {
         flex: 1 1 auto !important;
@@ -548,128 +551,47 @@
         box-shadow: none !important;
     }
 
-    .card--stat .stat-value {
-        font-size: 9pt !important;
-        font-weight: 600 !important;
-        text-align: left !important;
-    }
-
-    .card--stat .stat-label {
-        font-size: 6.5pt !important;
-        text-align: left !important;
-    }
-
+    .card--stat .stat-value { font-size: 9pt !important; font-weight: 600 !important; text-align: left !important; }
+    .card--stat .stat-label { font-size: 6.5pt !important; text-align: left !important; }
     .card--stat:hover { transform: none !important; }
 
-    /* ------ KPI 卡片 ------ */
-    .kpi-row {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 8px !important;
-    }
-    .kpi-card {
-        flex: 1 !important;
-        min-width: 120px !important;
-    }
-    .kpi-val {
-        font-size: 11pt !important;
-    }
+    .kpi-row { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
+    .kpi-card { flex: 1 !important; min-width: 120px !important; }
+    .kpi-val  { font-size: 11pt !important; }
 
-    /* ------ 表单 ------ */
     .form-grid,
     .form-grid.form-grid--3,
-    .form-grid.form-grid--4 {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 8px !important;
-    }
+    .form-grid.form-grid--4 { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
 
-    .order-first-row { grid-template-columns: repeat(2, 1fr) !important; }
-    .fee-cards-row    { grid-template-columns: repeat(2, 1fr) !important; }
-    .repayment-cards-row { grid-template-columns: repeat(3, 1fr) !important; }
+    .order-first-row      { grid-template-columns: repeat(2, 1fr) !important; }
+    .fee-cards-row        { grid-template-columns: repeat(2, 1fr) !important; }
+    .repayment-cards-row  { grid-template-columns: repeat(3, 1fr) !important; }
 
-    .info-display {
-        grid-template-columns: repeat(2, 1fr) !important;
-        border: 1px solid #ccc !important;
-        background: #fff !important;
-    }
+    .info-display { grid-template-columns: repeat(2, 1fr) !important; border: 1px solid #ccc !important; background: #fff !important; }
 
-    .repayment-card {
-        border: 1px solid #ccc !important;
-        box-shadow: none !important;
-        page-break-inside: avoid !important;
-    }
-
-    .repayment-card.selected {
-        border-color: #999 !important;
-        background: #fff !important;
-    }
-
-    .repayment-card-header input[type="radio"] {
-        display: inline-block !important;
-        border: 1px solid #000 !important;
-    }
+    .repayment-card { border: 1px solid #ccc !important; box-shadow: none !important; page-break-inside: avoid !important; }
+    .repayment-card.selected { border-color: #999 !important; background: #fff !important; }
+    .repayment-card-header input[type="radio"] { display: inline-block !important; border: 1px solid #000 !important; }
 
     .form-group input,
     .form-group select,
-    .form-group textarea {
-        border: 1px solid #ccc !important;
-        background: #fff !important;
-    }
+    .form-group textarea { border: 1px solid #ccc !important; background: #fff !important; }
 
-    .fixed-repayment-form {
-        border: 1px solid #ccc !important;
-        background: #fff !important;
-        page-break-inside: avoid !important;
-    }
+    .fixed-repayment-form { border: 1px solid #ccc !important; background: #fff !important; page-break-inside: avoid !important; }
+    .fee-card { border: 1px solid #ccc !important; background: #fff !important; }
+    .payment-method-row { background: #fff !important; border: 1px solid #ccc !important; }
 
-    .fee-card {
-        border: 1px solid #ccc !important;
-        background: #fff !important;
-    }
+    .anomaly-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+    .anomaly-card { break-inside: avoid !important; page-break-inside: avoid !important; box-shadow: none !important; border: 1px solid #ccc !important; }
 
-    .payment-method-row {
-        background: #fff !important;
-        border: 1px solid #ccc !important;
-    }
-
-    /* ------ 异常页面 ------ */
-    .anomaly-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
-        gap: 8px !important;
-    }
-
-    .anomaly-card {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-        box-shadow: none !important;
-        border: 1px solid #ccc !important;
-    }
-
-    /* ------ 订单详情 ------ */
     .order-detail-grid { grid-template-columns: repeat(4, 1fr) !important; }
 
-    /* ------ 备份页面 ------ */
     .backup-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .backup-card { border: 1px solid #ccc !important; box-shadow: none !important; }
+    .backup-card-primary { background: #fff !important; border-left: 4px solid #999 !important; }
+    .fixed-repayment-card { background: #fff !important; border-left: 4px solid #999 !important; }
 
-    .backup-card {
-        border: 1px solid #ccc !important;
-        box-shadow: none !important;
-    }
-
-    .backup-card-primary {
-        background: #fff !important;
-        border-left: 4px solid #999 !important;
-    }
-
-    .fixed-repayment-card {
-        background: #fff !important;
-        border-left: 4px solid #999 !important;
-    }
-
-    /* ------ 门店财务汇总 ------ */
-    .store-cards-grid {
-        display: block;
-    }
+    .store-cards-grid { display: block; }
 
     .store-finance-card,
     .store-summary-card {
@@ -680,30 +602,20 @@
         box-shadow: none !important;
     }
 
-    .card-grid {
-        font-size: 8pt;
-        gap: 12px 6px;
-    }
+    .card-grid { font-size: 8pt; gap: 12px 6px; }
 
     .store-finance-card .card-grid div,
-    .store-summary-card .card-grid div {
-        background: none;
-        border: none;
-        padding: 2px 0;
-    }
+    .store-summary-card .card-grid div { background: none; border: none; padding: 2px 0; }
 
-    /* ------ 隐藏打印时不需要的按钮 ------ */
     .btn-backup-primary,
     .btn-restore,
     .btn-blacklist,
     .capital-btn,
-    .btn-capital-inject {
-        display: none !important;
-    }
+    .btn-capital-inject { display: none !important; }
 }
 
 /* ============================================================
-   五、收益处置三列网格（桌面端三列，移动端单列）
+   五、收益处置三列网格
    ============================================================ */
 .profit-cards-grid {
     display: grid;
@@ -717,30 +629,23 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 5px 8px;
-    gap: 6px;
+    padding: 6px 10px;
+    gap: var(--spacing-2);
 }
 
-.profit-cards-grid .card .form-actions {
-    margin-top: auto;
-}
+.profit-cards-grid .card .form-actions { margin-top: auto; }
 
-/* 移动端适配 */
 @media (max-width: 768px) {
     .profit-cards-grid {
         grid-template-columns: 1fr;
         gap: var(--spacing-2);
     }
-    .profit-cards-grid .card {
-        padding: 5px 6px;
-    }
+    .profit-cards-grid .card { padding: 6px 8px; }
 }
 
 /* ============================================================
-   六、门店财务汇总屏幕显示样式（优化分隔）
+   六、门店财务汇总屏幕显示样式
    ============================================================ */
-
-/* ---------- 基础卡片容器 ---------- */
 .store-cards-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -748,95 +653,68 @@
     margin-bottom: 24px;
 }
 
-/* ---------- 财务卡片 & 汇总卡片 ---------- */
 .store-finance-card,
 .store-summary-card {
     border: 1px solid #cbd5e1;
     border-radius: 12px;
-    padding: 12px;
+    padding: 14px;
     background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     transition: box-shadow 0.2s;
     break-inside: avoid;
 }
 
-.store-finance-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
+.store-finance-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 
-.store-summary-card {
-    background: #f8fafc;
-    border-width: 2px;
-}
+.store-summary-card { background: #f8fafc; border-width: 2px; }
 
-/* ---------- 卡片标题 ---------- */
 .store-finance-card .card-header,
 .store-summary-card .card-header {
-    font-weight: bold;
-    font-size: 1.1rem;
+    font-weight: 700;
+    font-size: var(--font-md);
     padding-bottom: 6px;
     margin-bottom: 8px;
     border-bottom: 1px solid #e2e8f0;
     text-align: center;
 }
 
-/* ---------- 卡片内部指标网格 ---------- */
 .card-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px 16px;               /* 增大行/列间距，条目更独立 */
-    font-size: 0.85rem;
+    gap: 14px 16px;
+    font-size: var(--font-sm);
 }
 
-.card-grid.summary {
-    font-weight: 500;
-}
+.card-grid.summary { font-weight: 500; }
 
-/* ----- 普通门店卡片指标 ----- */
 .store-finance-card .card-grid div {
-    background: #f8fafc;          /* 极淡灰背景，交替感自然 */
-    border: 1px solid #edf2f7;    /* 细微边框 */
-    border-bottom: 2px solid #e2e8f0; /* 底部稍重的分隔线 */
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-bottom: 2px solid #e2e8f0;
     border-radius: 6px;
-    padding: 8px 10px;            /* 加大内边距，文字更舒展 */
-    line-height: 1.4;
+    padding: 8px 10px;
+    line-height: var(--leading-normal);
 }
 
-/* 最后一行移除底部分隔线（保持视觉闭合） */
 .store-finance-card .card-grid div:nth-last-child(-n+3) {
-    border-bottom: 1px solid #edf2f7;  /* 回到普通边框，不加重 */
+    border-bottom: 1px solid #edf2f7;
 }
 
-/* ----- 汇总卡片指标（简洁） ----- */
 .store-summary-card .card-grid div {
     background: transparent;
     border: none;
     border-bottom: 1px solid #e9eef3;
     border-radius: 0;
     padding: 6px 8px;
-    line-height: 1.3;
-}
-.store-summary-card .card-grid div:nth-last-child(-n+3) {
-    border-bottom: none;
+    line-height: var(--leading-tight);
 }
 
-/* 汇总卡片与前面卡片的间距 */
-.card > .store-cards-grid + .store-summary-card {
-    margin-top: 16px;
-}
+.store-summary-card .card-grid div:nth-last-child(-n+3) { border-bottom: none; }
 
-/* ---------- 移动端适配 ---------- */
+.card > .store-cards-grid + .store-summary-card { margin-top: 16px; }
+
 @media (max-width: 768px) {
-    .store-cards-grid {
-        grid-template-columns: 1fr;
-    }
-    .card-grid {
-        gap: 8px 10px;
-        font-size: 0.8rem;
-    }
-    .store-finance-card .card-grid div {
-        padding: 6px 8px;
-    }
+    .store-cards-grid { grid-template-columns: 1fr; }
+    .card-grid { gap: 8px 10px; font-size: var(--font-xs); }
+    .store-finance-card .card-grid div { padding: 6px 8px; }
 }
-
-
