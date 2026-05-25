@@ -1,5 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（优化版：侧边栏滚动 + 间距紧凑）
+   dashboard.css - 仪表盘专属布局（最终版）
    ============================== */
 @layer pages {
   :root {
@@ -45,67 +45,67 @@
     border-right: 1px solid rgba(14, 116, 144, 0.15);
   }
 
-  /* Logo 区：紧凑 */
+  /* Logo 区：极致紧凑 */
   .sidebar-logo {
-    padding: 6px 12px 4px;
+    padding: 4px 12px 3px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     flex-shrink: 0;
   }
-  .logo-mark { display: flex; align-items: center; gap: 8px; }
+  .logo-mark { display: flex; align-items: center; gap: 6px; }
   .logo-icon {
-    width: 28px; height: 28px; font-size: 12px;
+    width: 24px; height: 24px; font-size: 11px;
     background: var(--gradient-cta);
-    border-radius: 6px;
+    border-radius: 5px;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; color: var(--white);
     font-family: var(--font-mono); flex-shrink: 0;
   }
   .logo-text {
-    font-size: 0.8rem; font-weight: 700; color: var(--gray-500);
-    line-height: 1.2;
+    font-size: 0.7rem; font-weight: 700; color: var(--gray-500);
+    line-height: 1.1;
   }
-  .logo-sub { font-size: 0.55rem; color: var(--gray-500); font-weight: 400; }
+  .logo-sub { font-size: 0.5rem; color: var(--gray-500); font-weight: 400; }
 
-  /* 用户信息区：紧凑 */
+  /* 用户信息区：极致紧凑 */
   .sidebar-user {
-    padding: 6px 12px;
+    padding: 4px 12px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
-    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   }
   .user-av {
-    width: 32px; height: 32px; font-size: 0.75rem;
+    width: 28px; height: 28px; font-size: 0.7rem;
     background: var(--gradient-cta); border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; color: var(--white); flex-shrink: 0;
   }
-  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
   .user-name-top {
-    font-size: 0.75rem; font-weight: 700; color: #0c1929;
+    font-size: 0.7rem; font-weight: 700; color: #0c1929;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .user-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-  .user-role { font-size: 0.6rem; color: var(--gray-600); font-weight: 500; white-space: nowrap; }
+  .user-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+  .user-role { font-size: 0.55rem; color: var(--gray-600); font-weight: 500; white-space: nowrap; }
   .user-store-badge {
     background: rgba(14, 116, 144, 0.12);
     border: 1px solid rgba(14, 116, 144, 0.25);
     color: var(--primary);
-    font-size: 0.55rem;
-    padding: 1px 6px;
-    border-radius: 12px;
+    font-size: 0.5rem;
+    padding: 1px 4px;
+    border-radius: 10px;
     font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;
   }
 
-  /* 导航菜单区：紧凑间距 + 可滚动 */
+  /* 导航菜单区：超紧凑间距 + 可滚动 */
   .sidebar-nav {
     flex: 1;
     min-height: 0;
     overflow-y: auto !important;
-    padding: 4px 6px;
+    padding: 3px 6px;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 0px;
   }
   .sidebar-nav::-webkit-scrollbar {
     width: 3px;
@@ -120,18 +120,18 @@
   }
 
   .nav-section-label {
-    font-size: 0.55rem;
+    font-size: 0.5rem;
     font-weight: 700; color: var(--gray-500);
     letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 4px 8px 2px;
+    padding: 3px 8px 1px;
   }
   .nav-item {
-    display: flex; align-items: center; gap: 6px;
-    padding: 4px 8px;
-    border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    padding: 3px 6px;
+    border-radius: 5px; cursor: pointer;
     transition: all 0.15s ease;
     color: var(--gray-700);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 500;
     border: 1px solid transparent;
     flex-shrink: 0;
@@ -142,48 +142,55 @@
     color: var(--primary); border: 1px solid rgba(14, 116, 144, 0.35);
   }
   .nav-item.danger:hover { background: rgba(220, 38, 38, 0.12); color: var(--danger); }
-  .nav-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+  .nav-icon { font-size: 12px; width: 16px; text-align: center; flex-shrink: 0; }
   .nav-badge {
     margin-left: auto; background: var(--red-600); color: var(--white);
-    font-size: 0.52rem; padding: 1px 5px; border-radius: 8px;
+    font-size: 0.48rem; padding: 0px 4px; border-radius: 6px;
     font-weight: 700; line-height: 1.3;
   }
 
-  /* 底部区域：固定在底部 */
+  /* 底部区域：固定在底部，进一步压缩 */
   .sidebar-footer {
     flex-shrink: 0;
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-top: 1px solid rgba(14, 116, 144, 0.2);
     background: var(--gradient-sidebar);
   }
   .lang-toggle {
     display: flex; flex-direction: column; align-items: stretch;
-    background: rgba(14, 116, 144, 0.1); border-radius: 6px;
+    background: rgba(14, 116, 144, 0.1); border-radius: 5px;
     padding: 2px; gap: 2px;
   }
   .lang-btn-side {
-    display: block; padding: 3px 6px;
-    text-align: center; border-radius: 4px;
+    display: block; padding: 2px 5px;
+    text-align: center; border-radius: 3px;
     background: transparent; border: 1px solid transparent;
     transition: background 0.2s;
-    cursor: pointer; font-size: 0.65rem;
+    cursor: pointer; font-size: 0.6rem;
     color: var(--gray-700);
   }
   .lang-btn-side:hover { background: rgba(14, 116, 144, 0.2); }
   .lang-btn-side.active-lang { background: rgba(14, 116, 144, 0.35); color: var(--primary); border-color: rgba(14, 116, 144, 0.5); }
+
+  /* 底部刷新按钮（如有） */
+  .sidebar-footer div[style*="text-align:center"] {
+    margin-top: 2px !important;
+    padding: 1px !important;
+    font-size: 0.55rem !important;
+  }
 
   .dash-topbar { display: none; }
 
   /* 右侧主内容区：独立滚动 + 底部充足空间 */
   .dash-main {
     grid-area: main;
-    padding: 12px 20px 48px 20px;
+    padding: 12px 20px 56px 20px;
     overflow-y: auto !important;
     height: 100vh;
     scroll-behavior: smooth;
   }
   .dash-main > :last-child {
-    margin-bottom: 24px;
+    margin-bottom: 30px;
   }
   .dash-main::-webkit-scrollbar {
     width: 6px;
@@ -313,26 +320,26 @@
   .fund-stat-val { font-size: var(--font-md); font-weight: 700; font-family: var(--font-mono); }
 
   .fund-total-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
-  .fund-block { border-radius: 8px; padding: 8px 6px; display: flex; flex-direction: column; gap: 2px; }
+  .fund-block { border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
   .fund-block--injected { background: #e0f2fe; border: 1px solid #7dd3fc; }
   .fund-block--deployed  { background: #fef9c3; border: 1px solid #fde047; }
   .fund-block--free      { background: #dcfce7; border: 1px solid #86efac; }
-  .fund-block-label { font-size: 10px; font-weight: 600; text-transform: uppercase; }
-  .fund-block-val { font-size: var(--font-md); font-weight: 700; font-family: var(--font-mono); }
+  .fund-block-label { font-size: 9px; font-weight: 600; text-transform: uppercase; }
+  .fund-block-val { font-size: var(--font-sm); font-weight: 700; font-family: var(--font-mono); }
 
   .cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 0; }
   .cash-bank-item {
     background: #f4f8fb;
     border: 1px solid #c8d8e8;
     border-radius: 8px;
-    padding: 6px 8px;
+    padding: 5px 8px;
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
-  .cb-label { font-size: 10px; color: var(--gray-600); font-weight: 600; display: flex; align-items: center; gap: 4px; }
-  .cb-val { font-size: var(--font-md); font-weight: 700; font-family: var(--font-mono); }
-  .cb-flow { font-size: 9px; color: var(--gray-500); }
+  .cb-label { font-size: 9px; color: var(--gray-600); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .cb-val { font-size: var(--font-sm); font-weight: 700; font-family: var(--font-mono); }
+  .cb-flow { font-size: 8px; color: var(--gray-500); }
   .cb-flow span.in  { color: var(--green-700); font-weight: 600; }
   .cb-flow span.out { color: var(--red-700); font-weight: 600; }
 
@@ -342,31 +349,31 @@
     background: #f4f8fb;
     border: 1px solid #c8d8e8;
     border-radius: 6px;
-    padding: 5px 4px;
+    padding: 4px 4px;
     text-align: center;
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
   }
   .tx-btn-v2:hover { background: #e0f2fe; border-color: #7dd3fc; color: var(--primary); }
 
   .income-items { display: flex; flex-direction: column; gap: 3px; }
-  .income-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; background: #f4f8fb; border-radius: 6px; }
-  .income-name { font-size: 11px; font-weight: 500; flex: 1; }
-  .income-amt { font-size: var(--font-sm); font-weight: 700; font-family: var(--font-mono); color: var(--green-700); }
+  .income-item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; background: #f4f8fb; border-radius: 6px; }
+  .income-name { font-size: 10px; font-weight: 500; flex: 1; }
+  .income-amt { font-size: var(--font-xs); font-weight: 700; font-family: var(--font-mono); color: var(--green-700); }
   .income-amt.expense { color: var(--red-700); }
 
   .net-profit-box {
     background: var(--gradient-net-profit);
     border: 1px solid #7dd3fc;
     border-radius: 8px;
-    padding: 5px 8px;
+    padding: 4px 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-top: 6px;
   }
-  .np-label { font-size: 0.7rem; font-weight: 600; color: #0c4a6e; }
-  .np-val { font-size: var(--font-md); font-weight: 700; font-family: var(--font-mono); color: var(--primary); }
+  .np-label { font-size: 0.65rem; font-weight: 600; color: #0c4a6e; }
+  .np-val { font-size: var(--font-sm); font-weight: 700; font-family: var(--font-mono); color: var(--primary); }
 
   /* 底部三列 */
   .bottom-row { display: grid; gap: 10px; align-items: stretch; }
@@ -392,8 +399,8 @@
     cursor: pointer;
   }
   .quick-btn:hover { border-color: #7dd3fc; background: #e0f2fe; }
-  .qb-icon { font-size: 15px; }
-  .qb-label { font-size: 10px; font-weight: 600; text-align: center; }
+  .qb-icon { font-size: 14px; }
+  .qb-label { font-size: 9px; font-weight: 600; text-align: center; }
 
   .donut-area { display: flex; align-items: center; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
   .donut-svg { flex-shrink: 0; }
@@ -408,15 +415,15 @@
   .preview-list { display: flex; flex-direction: column; gap: 6px; }
   .preview-item {
     display: flex; align-items: center; gap: 6px;
-    padding: 5px 8px;
+    padding: 4px 6px;
     background: #f8fafc;
     border-radius: 6px;
-    font-size: 10px;
+    font-size: 9px;
     border-left: 2px solid var(--gray-300);
   }
   .preview-item.urgent { border-left-color: var(--red-500); background: #fef2f2; }
-  .preview-order { font-weight: 600; color: var(--primary); min-width: 70px; font-size: 10px; }
-  .preview-name { flex: 1; color: var(--gray-800); font-size: 10px; }
+  .preview-order { font-weight: 600; color: var(--primary); min-width: 65px; font-size: 9px; }
+  .preview-name { flex: 1; color: var(--gray-800); font-size: 9px; }
 
   .sidebar-overlay {
     display: none;
