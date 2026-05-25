@@ -3,7 +3,7 @@
    ============================== */
 @layer pages {
   :root {
-    --sidebar-width: 210px;
+    --sidebar-width: clamp(180px, 14vw, 240px);   /* 15.6" FHD基准≈210px，大屏略宽，小屏自然收窄 */
     --topbar-height: 50px;
     --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
@@ -231,7 +231,7 @@
   /* 主内容区 */
   .dash-main {
     grid-area: main;
-    padding: 12px 16px;
+    padding: clamp(10px, 1.2vh, 16px) clamp(12px, 1.5vw, 24px);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -242,6 +242,14 @@
     height: 100%;     /* 撑满 grid 行 */
   }
 
+  /* 桌面端内容区宽度上限：以15.6" FHD为基准，超宽屏内容居中不无限拉伸 */
+  @media (min-width: 769px) {
+    .dash-main > * {
+      max-width: 1280px;
+      width: 100%;
+    }
+  }
+
   /* 订单列表卡片：网页端不横向滚动，撑满宽度 */
   .order-table-card {
     min-width: 0;
@@ -250,14 +258,14 @@
   }
 
   /* KPI 卡片 */
-  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 1vw, 12px); }
   .kpi-card {
     background: var(--white);
     border-radius: 12px;
     border: 1px solid #c8d8e8;
     box-shadow: var(--shadow-sm);
     transition: box-shadow 0.2s ease, transform 0.2s ease;
-    padding: 14px 12px;
+    padding: clamp(10px, 1.2vh, 16px) clamp(10px, 1vw, 16px);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -280,7 +288,7 @@
   .kpi-item { display: flex; flex-direction: column; gap: 2px; }
   .kpi-label { font-size: var(--font-xs); font-weight: 600; color: var(--gray-600); text-align: left; }
   .kpi-val {
-    font-size: 1.6rem;
+    font-size: clamp(1.2rem, 2.2vw, 1.6rem);   /* 15.6" FHD≈1.55rem，小屏自然收缩 */
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: -0.02em;
@@ -382,7 +390,7 @@
   .cal-popup-card-amount { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
   /* 中间行 */
-  .mid-row { display: grid; grid-template-columns: 1fr 280px; gap: 10px; align-items: stretch; }
+  .mid-row { display: grid; grid-template-columns: 1fr clamp(240px, 22vw, 320px); gap: clamp(6px, 1vw, 12px); align-items: stretch; }
   .fund-flow-card, .income-card {
     background: var(--white);
     border-radius: 12px;
@@ -687,6 +695,10 @@
       height: auto;
       min-height: calc(100vh - 56px);
       min-width: 0;
+    }
+    /* 手机端取消桌面的 max-width 限制，内容满宽显示 */
+    .dash-main > * {
+      max-width: none;
     }
     body.menu-open { overflow: hidden; position: fixed; width: 100%; }
 
