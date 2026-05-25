@@ -9,22 +9,29 @@
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
   }
 
-  html, body {
-    height: 100%;
-    overflow: hidden;
+  /* 桌面端锁定滚动（防止 dashboard 双滚动条）*/
+  @media (min-width: 769px) {
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
   }
 
   .dashboard-v2 {
-    margin: -16px;
-    width: calc(100% + 32px);
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: 1fr;
     grid-template-areas: "sidebar main";
-    height: 100vh;
-    overflow: hidden;
     background: #f5f6fa;
     font-family: var(--font-sans);
+  }
+  @media (min-width: 769px) {
+    .dashboard-v2 {
+      margin: -16px;
+      width: calc(100% + 32px);
+      height: 100vh;
+      overflow: hidden;
+    }
   }
   .dashboard-v2,
   .dashboard-v2 *,
@@ -458,17 +465,26 @@
   /* 移动端适配 */
   @media (max-width: 768px) {
     .dashboard-v2 {
-      margin: -8px;
-      width: calc(100% + 16px);
       display: block !important;
+      margin: 0;
+      width: 100%;
       min-height: 100vh;
     }
     .dash-topbar {
-      position: sticky; top: 0; z-index: var(--z-topbar);
-      background: var(--white); padding: 0 12px; height: 50px;
+      position: sticky;
+      top: 0;
+      top: env(safe-area-inset-top, 0px);
+      z-index: var(--z-topbar);
+      background: var(--white);
+      padding: 0 16px;
+      padding-top: env(safe-area-inset-top, 0px);
+      height: 54px;
+      min-height: 54px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      border-bottom: 1px solid var(--border-light);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     }
     .topbar-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
     .topbar-title { font-size: var(--font-md) !important; }
@@ -492,19 +508,25 @@
       background: rgba(0,0,0,0.5);
       z-index: 98;
     }
-    html, body { height: auto; overflow: auto; }
+    html, body {
+      height: auto !important;
+      overflow: auto !important;
+      overflow-x: hidden !important;
+    }
     .dashboard-v2 {
-      height: auto; min-height: 100vh;
+      height: auto !important;
+      min-height: 100vh;
       grid-template-columns: 1fr;
       grid-template-rows: var(--topbar-height) 1fr;
       grid-template-areas: "topbar" "main";
     }
     .dash-topbar { display: flex; }
     .dash-main {
-      padding: 12px;
-      height: auto;
-      min-height: calc(100vh - 50px);
-      overflow-y: visible;
+      padding: 12px 12px 32px;
+      padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+      height: auto !important;
+      min-height: calc(100vh - 54px);
+      overflow-y: visible !important;
     }
     body.menu-open { overflow: hidden; position: fixed; width: 100%; }
 
@@ -568,10 +590,12 @@
     width: 100%;
     padding: 12px 16px 32px;
   }
-  html:has(#app .dashboard-v2) body,
-  html:has(#app .dashboard-v2) {
-    height: 100%;
-    overflow: hidden;
+  @media (min-width: 769px) {
+    html:has(#app .dashboard-v2) body,
+    html:has(#app .dashboard-v2) {
+      height: 100%;
+      overflow: hidden;
+    }
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
