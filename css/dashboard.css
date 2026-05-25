@@ -1,6 +1,5 @@
 /* ==============================
-   dashboard.css - 仪表盘专属布局（最终版）
-   侧边栏菜单可滚动 + 右侧内容区独立滚动 + 底部完整显示
+   dashboard.css - 仪表盘专属布局（字体保持原样 + 侧边栏可滚动）
    ============================== */
 @layer pages {
   :root {
@@ -10,11 +9,13 @@
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
   }
 
+  /* 防止页面级滚动 */
   html, body {
     height: 100%;
     overflow: hidden;
   }
 
+  /* 仪表盘外壳：严格 100vh，不允许超出 */
   .dashboard-v2 {
     margin: -16px;
     width: calc(100% + 32px);
@@ -34,7 +35,7 @@
     box-sizing: border-box;
   }
 
-  /* ========== 侧边栏：固定高度，菜单区域可滚动，底部固定 ========== */
+  /* 侧边栏：整体固定，内部菜单区域滚动 */
   .dash-sidebar {
     grid-area: sidebar;
     background: var(--gradient-sidebar);
@@ -46,6 +47,7 @@
     border-right: 1px solid rgba(14, 116, 144, 0.15);
   }
 
+  /* Logo 区 */
   .sidebar-logo {
     padding: 8px 16px 6px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
@@ -67,6 +69,7 @@
   }
   .logo-sub { font-size: 0.6rem; color: var(--gray-500); font-weight: 400; }
 
+  /* 用户信息区 */
   .sidebar-user {
     padding: 8px 16px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
@@ -108,6 +111,7 @@
     flex-direction: column;
     gap: 2px;
   }
+  /* 美化滚动条 */
   .sidebar-nav::-webkit-scrollbar {
     width: 4px;
   }
@@ -176,7 +180,7 @@
 
   .dash-topbar { display: none; }
 
-  /* ========== 右侧主内容区：独立滚动，底部完整显示 ========== */
+  /* 右侧主内容区：独立滚动，底部完整显示 */
   .dash-main {
     grid-area: main;
     padding: 12px 20px 48px 20px;
@@ -199,7 +203,9 @@
     border-radius: 4px;
   }
 
-  /* ---------- KPI 卡片 ---------- */
+  /* ---------- 以下保持原有字体大小，不做任何修改 ---------- */
+  
+  /* KPI 卡片 */
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 1vw, 12px); }
   .kpi-card {
     background: var(--white);
@@ -227,7 +233,6 @@
   .kpi-card--green::before  { background: var(--gradient-kpi-green); }
 
   .kpi-icon { font-size: 28px; text-align: center; display: block; margin-bottom: 6px; }
-  .kpi-item { display: flex; flex-direction: column; gap: 2px; }
   .kpi-label { font-size: var(--font-xs); font-weight: 600; color: var(--gray-600); text-align: left; }
   .kpi-val {
     font-size: clamp(1.2rem, 2.2vw, 1.6rem);
@@ -250,7 +255,7 @@
     .kpi-card--calendar { grid-column: span 2; }
   }
 
-  /* ---------- 工作日历 ---------- */
+  /* 工作日历 */
   .work-calendar { width: 100%; font-size: 10px; }
   .calendar-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -325,7 +330,7 @@
   .cal-popup-card-name { font-size: 12px; color: var(--text-primary); font-weight: 500; }
   .cal-popup-card-amount { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-  /* ---------- 中间行 ---------- */
+  /* 中间行 */
   .mid-row { display: grid; grid-template-columns: 1fr clamp(240px, 22vw, 320px); gap: clamp(6px, 1vw, 12px); align-items: stretch; }
   .fund-flow-card, .income-card {
     background: var(--white);
@@ -377,21 +382,6 @@
   .fund-block--deployed  .fund-block-val { color: #78350f; }
   .fund-block--free      .fund-block-val { color: #14532d; }
   .fund-block-sub { font-size: var(--font-xs); color: var(--gray-500); }
-
-  .util-bar-wrap { display: flex; flex-direction: column; gap: 4px; margin: 0; }
-  .util-bar-label { display: flex; justify-content: space-between; font-size: var(--font-xs); font-weight: 500; color: var(--gray-600); }
-  .util-bar-pct { font-weight: 700; color: var(--amber-500); }
-  .util-bar-track { height: 8px; background: var(--gray-100); border-radius: 8px; overflow: hidden; }
-  .util-bar-fill { height: 100%; background: var(--gradient-util-bar); border-radius: 8px; transition: width 0.6s ease; }
-  .util-bar-hint {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 10px; color: var(--gray-400);
-    background: var(--gray-50); border: 1px solid var(--border-light);
-    border-radius: 6px; padding: 3px 8px; margin-top: 3px;
-  }
-  .util-bar-hint-status { font-size: 10px; font-weight: 600; }
-  .util-bar-hint-status.warn { color: #d97706; }
-  .util-bar-hint-status.ok   { color: #16a34a; }
 
   .cash-bank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0; }
   .cash-bank-item {
