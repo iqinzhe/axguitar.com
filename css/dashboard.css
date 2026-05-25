@@ -332,8 +332,12 @@
   }
   .cal-badge--due { background: #fee2e2; color: #b91c1c; }
   .cal-badge--due.cal-overdue { background: #991b1b; color: #fff; }
+  /* 本金到期徽章：橙色系，与利息到期红色系区分 */
+  .cal-badge--pawn { background: #ffedd5; color: #c2410c; }
+  .cal-badge--pawn.cal-overdue-pawn { background: #9a3412; color: #fff; }
   .cal-badge--new { background: #dbeafe; color: #1d4ed8; }
   .cal-badge--due:hover { background: #fca5a5; }
+  .cal-badge--pawn:hover { background: #fed7aa; }
   .cal-badge--new:hover { background: #bfdbfe; }
 
   /* 可休息标记 */
@@ -372,6 +376,7 @@
   .cal-popup-order { font-weight: 700; color: var(--primary); font-size: 11px; }
   .cal-popup-badge { font-size: 9px; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
   .cal-popup-badge--due { background: #fee2e2; color: #b91c1c; }
+  .cal-popup-badge--pawn { background: #ffedd5; color: #c2410c; }
   .cal-popup-badge--new { background: #dbeafe; color: #1d4ed8; }
   .cal-popup-card-name { font-size: 12px; color: var(--text-primary); font-weight: 500; }
   .cal-popup-card-amount { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
