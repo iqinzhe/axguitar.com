@@ -604,6 +604,15 @@
             if (expenseAmtEl) { expenseAmtEl.style.transition = 'opacity 0.4s'; expenseAmtEl.style.opacity = '0'; setTimeout(function(){ expenseAmtEl.textContent = '−' + Utils.formatCurrency(totalExpenses); expenseAmtEl.style.opacity = '1'; }, 400); }
             const expenseSubEl = document.getElementById('expenseSub');
             if (expenseSubEl) { setTimeout(function(){ expenseSubEl.textContent = lang === 'id' ? 'Bulan ini' : '本月合计'; }, 400); }
+            // Bug1修复：可动用资金统一使用现金流余额（现金+银行），与门店财务汇总保持一致。
+            // 初始渲染时用 injected-deployed 是占位值，此处异步获取真实余额后覆盖。
+            const availableFundValEl = document.querySelector('.fund-block--free .fund-block-val');
+            const availableBalance = cashBalance + bankBalance;
+            if (availableFundValEl) {
+                availableFundValEl.style.transition = 'opacity 0.4s';
+                availableFundValEl.style.opacity = '0';
+                setTimeout(function(){ availableFundValEl.textContent = Utils.formatCurrency(availableBalance); availableFundValEl.style.opacity = '1'; }, 400);
+            }
             const messagePreview = document.querySelector('.message-preview');
             if (messagePreview) {
                 const pendingCount = messages.length;
@@ -753,9 +762,9 @@
                         })()
                     ]);
 
-                    const todayDate = new Date();
-                    todayDate.setHours(0, 0, 0, 0);
-                    const todayStr = todayDate.toISOString().split('T')[0];
+                    // Bug5修复：统一使用 Utils.getLocalToday()（Jakarta 时区）做字符串比较，
+                    // 与 supabase.js updateOverdueDays() 的逻辑保持一致，避免时区差异导致逾期判断不一。
+                    const todayStr = Utils.getLocalToday();
 
                     let totalOrders = 0, activeOrders = 0, completedOrders = 0, overdueOrders = 0;
                     let totalLoanActive = 0, totalLoanAll = 0;

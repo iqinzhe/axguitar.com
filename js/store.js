@@ -423,7 +423,8 @@
                 orderIds.push(o.id);
                 stats.totalOrders++;
                 stats.totalLoanAmount += (o.loan_amount || 0);
-                if (o.admin_fee_paid) stats.totalAdminFee += (o.admin_fee || 0);
+                // Bug3修复：totalAdminFee 改从 payment_history 查询，与月度管理费口径统一
+                // 原来用 o.admin_fee_paid ? o.admin_fee : 0，当管理员手动调整过管理费时会与实收金额不符
                 stats.totalServiceFee += (o.service_fee_paid || 0);
                 stats.totalInterest += (o.interest_paid_total || 0);
                 stats.totalPrincipal += (o.principal_paid || 0);
@@ -439,13 +440,16 @@
                 }
             }
 
-            // 获取本月费用
+            // 获取本月及累计费用（统一从 payment_history 查询，确保管理费/服务费/利息口径一致）
             if (orderIds.length > 0) {
-                const { data: monthAdminFees } = await client
-                    .from('payment_history').select('order_id, amount')
-                    .eq('type', 'admin_fee').gte('date', monthStart).lte('date', monthEnd).in('order_id', orderIds);
-                if (monthAdminFees) {
-                    for (const p of monthAdminFees) stats.monthAdminFee += (p.amount || 0);
+                const { data: allAdminFees } = await client
+                    .from('payment_history').select('order_id, amount, date')
+                    .eq('type', 'admin_fee').in('order_id', orderIds);
+                if (allAdminFees) {
+                    for (const p of allAdminFees) {
+                        stats.totalAdminFee += (p.amount || 0);
+                        if (p.date >= monthStart && p.date <= monthEnd) stats.monthAdminFee += (p.amount || 0);
+                    }
                 }
                 
                 const { data: monthServiceFees } = await client
@@ -829,7 +833,7 @@
                     const stats = storeStats[sid];
                     stats.totalOrders++;
                     stats.totalLoanAmount += (o.loan_amount || 0);
-                    if (o.admin_fee_paid) stats.totalAdminFee += (o.admin_fee || 0);
+                    // Bug3修复：totalAdminFee 移到下方从 payment_history 统一查询
                     stats.totalServiceFee += (o.service_fee_paid || 0);
                     stats.totalInterest += (o.interest_paid_total || 0);
                     stats.totalPrincipal += (o.principal_paid || 0);
@@ -845,7 +849,44 @@
                     }
                 }
 
+                // Bug3修复：orderStoreMap 提取到外层只构建一次，三处查询复用，同时消除重复声明
+                const orderStoreMap = {};
+                for (const o of (allOrders || [])) orderStoreMap[o.id] = o.store_id;
+
                 const allOrderIds = (allOrders || []).map(o => o.id);
+                if (allOrderIds.length > 0) {
+                    // 管理费查全量（含累计），与月度口径统一，不再使用 orders.admin_fee 字段
+                    const { data: allAdminFees } = await client
+                        .from('payment_history').select('order_id, amount, date')
+                        .eq('type', 'admin_fee').in('order_id', allOrderIds);
+                    if (allAdminFees) {
+                        for (const p of allAdminFees) {
+                            const sid = orderStoreMap[p.order_id];
+                            if (sid && storeStats[sid]) {
+                                storeStats[sid].totalAdminFee += (p.amount || 0);
+                                if (p.date >= monthStart && p.date <= monthEnd) storeStats[sid].monthAdminFee += (p.amount || 0);
+                            }
+                        }
+                    }
+                    const { data: monthServiceFees } = await client
+                        .from('payment_history').select('order_id, amount')
+                        .eq('type', 'service_fee').gte('date', monthStart).lte('date', monthEnd).in('order_id', allOrderIds);
+                    if (monthServiceFees) {
+                        for (const p of monthServiceFees) {
+                            const sid = orderStoreMap[p.order_id];
+                            if (sid && storeStats[sid]) storeStats[sid].monthServiceFee += (p.amount || 0);
+                        }
+                    }
+                    const { data: monthInterests } = await client
+                        .from('payment_history').select('order_id, amount')
+                        .eq('type', 'interest').gte('date', monthStart).lte('date', monthEnd).in('order_id', allOrderIds);
+                    if (monthInterests) {
+                        for (const p of monthInterests) {
+                            const sid = orderStoreMap[p.order_id];
+                            if (sid && storeStats[sid]) storeStats[sid].monthInterest += (p.amount || 0);
+                        }
+                    }
+                }
                 if (allOrderIds.length > 0) {
                     const { data: monthAdminFees } = await client
                         .from('payment_history').select('order_id, amount')

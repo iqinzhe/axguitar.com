@@ -1537,13 +1537,14 @@
             const newRemaining = (currentOrder.loan_amount||0) - newPaid;
             const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
             const isFull = newRemaining <= 0;
-            if (isFull) {
-                const shortfall = currentOrder.interest_shortfall || 0;
-                if (shortfall > 0) {
-                    throw new Error(Utils.lang === 'id'
-                        ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum melunasi pokok.`
-                        : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再结清本金。`);
-                }
+            // Bug4修复：利息欠款校验扩展到所有本金还款（不限于全额结清）。
+            // 原来仅 isFull 时才校验，操作员可用"差1元"的部分还款绕过拦截。
+            // 修复后：只要存在利息欠款，任何本金还款均需先补缴利息。
+            const shortfall = currentOrder.interest_shortfall || 0;
+            if (shortfall > 0) {
+                throw new Error(Utils.lang === 'id'
+                    ? `❌ Masih ada kekurangan bunga ${Utils.formatCurrency(shortfall)}. Harap lunasi terlebih dahulu sebelum membayar pokok.`
+                    : `❌ 存在累计利息欠款 ${Utils.formatCurrency(shortfall)}，请先补缴后再还本金。`);
             }
             let updates = { principal_paid: newPaid, principal_remaining: newRemaining, updated_at: nowStr() };
             if(isFull){
