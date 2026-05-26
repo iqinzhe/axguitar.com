@@ -195,12 +195,8 @@
             }
             const modals = document.querySelectorAll('.modal-overlay');
             modals.forEach(modal => modal.remove());
-            // 恢复滚动位置（修复 iOS position:fixed 导致页面跳顶的问题）
-            const scrollY = parseInt(document.body.style.top || '0', 10) * -1;
             document.body.style.overflow = '';
             document.body.style.position = '';
-            document.body.style.top = '';
-            if (scrollY) window.scrollTo(0, scrollY);
         },
 
         _initGlobalKeyboard() {
@@ -539,22 +535,8 @@
             const overlay = document.getElementById('sidebarOverlay');
             if (!sidebar) return;
             const isOpen = sidebar.classList.contains('open');
-            if (isOpen) {
-                // 恢复滚动位置（修复 iOS position:fixed 导致页面跳顶的问题）
-                const scrollY = parseInt(document.body.style.top || '0', 10) * -1;
-                sidebar.classList.remove('open');
-                if (overlay) overlay.classList.remove('active');
-                document.body.classList.remove('menu-open');
-                document.body.style.top = '';
-                window.scrollTo(0, scrollY);
-            } else {
-                // 保存当前滚动位置
-                const scrollY = window.scrollY || window.pageYOffset;
-                document.body.style.top = `-${scrollY}px`;
-                sidebar.classList.add('open');
-                if (overlay) overlay.classList.add('active');
-                document.body.classList.add('menu-open');
-            }
+            if (isOpen) { sidebar.classList.remove('open'); if (overlay) overlay.classList.remove('active'); document.body.classList.remove('menu-open'); }
+            else { sidebar.classList.add('open'); if (overlay) overlay.classList.add('active'); document.body.classList.add('menu-open'); }
             if (e && e.stopPropagation) e.stopPropagation();
         },
 
