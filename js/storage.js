@@ -34,7 +34,8 @@
                     storesPromise = SUPABASE.getAllStores();
                 } else if (currentStoreId) {
                     storesPromise = client.from('stores').select('*').eq('id', currentStoreId)
-                        .then(r => r.data || []);
+                        .then(r => r.data || [])
+                        .catch(e => { console.error('[storage] 门店查询失败:', e?.message); return []; });
                 } else {
                     storesPromise = Promise.resolve([]);
                 }

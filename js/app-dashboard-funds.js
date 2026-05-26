@@ -826,6 +826,7 @@
 
                 const modal = document.getElementById('gapDetectiveModal');
                 if (!modal) return;
+                // 安全说明：模板内所有用户数据均经 Utils.escapeHtml() 或 formatCurrency() 处理，数字字段来自数组长度（整数），无 XSS 风险
                 modal.querySelector('.modal-content').innerHTML = `
                     <h3>🕵️ ${lang==='id'?'Detektif Selisih Dana':'差额侦探 — 完整资金流向分析'}</h3>
 
