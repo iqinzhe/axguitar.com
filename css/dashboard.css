@@ -25,7 +25,7 @@
   /* 仪表盘外壳：严格 100vh，不允许超出 */
   .dashboard-v2 {
     margin: -12px;
-    width: calc(100% + 32px);
+    width: calc(100% + 5px);
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: 1fr;           /* 桌面端隐藏 topbar，只有一行 */
