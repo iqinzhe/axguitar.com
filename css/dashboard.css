@@ -7,8 +7,6 @@
 *::after {
     box-sizing: border-box;
 }
-  scrollbar-gutter: stable;  /* Edge 显示滚动条时不会挤压内容 */
-}
 
 @layer pages {
   :root {
@@ -24,7 +22,7 @@
     overflow: hidden;
   }
 
-  /* 仪表盘外壳：严格 100vh，不允许超出 */
+  /* 仪表盘外壳：撑满视口，兼容 Edge/Safari/手机浏览器 */
   .dashboard-v2 {
     margin: -12px;
     width: calc(100% + 5px);
@@ -32,7 +30,8 @@
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: 1fr;           /* 桌面端隐藏 topbar，只有一行 */
     grid-template-areas: "sidebar main";
-    height: 100dvh;
+    height: 100vh;                     /* 旧浏览器降级回退 */
+    height: 100dvh;                    /* 动态视口高度：自动适应 Edge 工具栏/手机地址栏 */
     overflow: hidden;
     background: #f5f6fa;
     font-family: var(--font-sans);
@@ -599,7 +598,6 @@
     justify-content: space-between;
     margin-bottom: 6px;
   }
-
   /* mobile-only：桌面隐藏，手机显示 */
   .mobile-only { display: none !important; }
   @media (max-width: 768px) {
@@ -614,17 +612,9 @@
       margin: -8px;
       width: calc(100% + 16px);
       display: block !important;
-      min-height: 100dvh;
-      min-height: calc(100dvh - 56px);
+      min-height: 100vh;             /* 旧浏览器降级回退 */
+      min-height: 100dvh;            /* 动态视口高度：手机地址栏出现/消失时自动适配 */
     }
-
-   /* 三星/安卓浏览器触摸滚动优化 */
-   .dash-main {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-  }
-}
-     
     .dash-topbar {
       position: sticky; top: 0; z-index: var(--z-topbar);
       background: var(--white); padding: 0 12px; height: 56px;
@@ -659,7 +649,7 @@
     /* 手机端恢复 body 可滚动（侧边栏是 fixed overlay，不占位） */
     html, body { height: auto; overflow: auto; }
     .dashboard-v2 {
-      height: auto; min-height: 100vh; overflow: visible;
+      height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible;
       grid-template-columns: 1fr;
       grid-template-rows: var(--topbar-height) 1fr;
       grid-template-areas: "topbar" "main";
@@ -673,6 +663,7 @@
       overflow-y: visible;
       height: auto;
       min-height: calc(100vh - 56px);
+      min-height: calc(100dvh - 56px);
       min-width: 0;
     }
     /* position:fixed + top 由 JS 动态写入（保存滚动位置），防止页面跳顶 */
@@ -781,7 +772,8 @@
 
     /* 子页面内容区：撑满视口，padding 留出呼吸空间 */
     html:not(:has(#app .dashboard-v2)) #app {
-      min-height: 100vh;
+      min-height: 100vh;             /* 旧浏览器降级回退 */
+      min-height: 100dvh;
       width: 100%;
       box-sizing: border-box;
       padding: 12px 16px 32px;
