@@ -50,7 +50,7 @@
 
   /* Logo 区：小屏缩减 padding */
   .sidebar-logo {
-    padding: clamp(5px, 1.2vh, 12px) 16px clamp(5px, 1vh, 10px);
+    padding: clamp(3px, 1.2vh, 12px) 15px clamp(3px, 1vh, 10px);
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     flex-shrink: 0;
   }
@@ -93,7 +93,7 @@
     font-weight: 700; color: #0c1929;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .user-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .user-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
   .user-role { font-size: clamp(0.6rem, 0.85vh, 0.68rem); color: var(--gray-600); font-weight: 500; white-space: nowrap; }
   .user-store-badge {
     background: rgba(14, 116, 144, 0.12); border: 1px solid rgba(14, 116, 144, 0.25);
@@ -110,10 +110,10 @@
     overflow: hidden;
   }
   .nav-section-label {
-    font-size: clamp(0.52rem, 0.75vh, 0.6rem);
+    font-size: clamp(0.7rem, 0.8vh, 0.9rem);
     font-weight: 700; color: var(--gray-600);
-    letter-spacing: 0.12em; text-transform: uppercase;
-    padding: clamp(1px, 0.3vh, 2px) 8px;
+    letter-spacing: 0.25em; text-transform: uppercase;
+    padding: clamp(1px, 0.3vh, 2px) 4px;
   }
   .nav-item {
     display: flex; align-items: center; gap: 8px;
@@ -135,8 +135,8 @@
   .nav-icon { font-size: clamp(12px, 1.7vh, 15px); width: 18px; text-align: center; flex-shrink: 0; }
   .nav-badge {
     margin-left: auto; background: var(--red-600); color: var(--white);
-    font-size: 0.58rem; padding: 1px 6px; border-radius: 6px;
-    font-weight: 700; line-height: 1.4;
+    font-size: 0.6rem; padding: 1px 3px; border-radius: 5px;
+    font-weight: 700; line-height: 1.2;
   }
 
   /* 底部语言切换：小屏缩减 */
