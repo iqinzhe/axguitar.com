@@ -117,15 +117,20 @@
     padding: clamp(1px, 0.3vh, 2px) 2px;
   }
   .nav-item {
-    display: flex; align-items: center; gap: 5px;
-    padding: clamp(1px, 0.3vh, 2px) 5px;
-    border-radius: 4px; cursor: pointer;
+    display: flex; 
+    align-items: center; 
+    gap: 4px;                          /* 减小图标与文字间距，为文字腾空间 */
+    padding: clamp(1px, 0.3vh, 2px) 4px;  /* 减小左右内边距，补偿字体变大占用的空间 */
+    border-radius: 4px; 
+    cursor: pointer;
     transition: all 0.15s ease;
     color: var(--gray-700);
-    font-size: clamp(0.7rem, 0.8vh, 0.9rem);
-    font-weight: 500; text-decoration: none;
+    font-size: clamp(0.85rem, 1.1vh, 1rem);  /* 加大字体（原 0.7rem → 0.85rem） */
+    font-weight: 500; 
+    text-decoration: none;
+    /* border: 3px solid transparent;  删除这一行，它会让按钮变大 */
     flex-shrink: 0;
-  }
+}
   .nav-item:hover { background: rgba(14, 116, 144, 0.12); color: var(--primary); }
   .nav-item.active {
     background: linear-gradient(135deg, rgba(14, 116, 144, 0.35), rgba(6, 182, 212, 0.15));
