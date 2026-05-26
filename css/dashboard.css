@@ -1,6 +1,14 @@
 /* ==============================
    dashboard.css - 仪表盘专属布局
    ============================== */
+
+/* 全局盒模型统一为 border-box（简洁、一致） */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 @layer pages {
   :root {
     --sidebar-width: 210px;
@@ -27,12 +35,6 @@
     overflow: hidden;
     background: #f5f6fa;
     font-family: var(--font-sans);
-  }
-  .dashboard-v2,
-  .dashboard-v2 *,
-  .dashboard-v2 *::before,
-  .dashboard-v2 *::after {
-    box-sizing: border-box;
   }
 
   /* 侧边栏：固定在 grid 内，内容多时自身滚动 */
@@ -74,7 +76,7 @@
 
   /* 用户信息区：小屏缩减 */
   .sidebar-user {
-    padding: clamp(3px, 1vh, 12px) 16px;
+    padding: clamp(6px, 1vh, 12px) 16px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     display: flex; align-items: center; gap: 10px; flex-shrink: 0;
   }
@@ -86,7 +88,7 @@
     font-weight: 700; color: var(--white); flex-shrink: 0;
     box-shadow: 0 2px 6px rgba(14, 116, 144, 0.2);
   }
-  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .user-name-top {
     font-size: clamp(0.7rem, 1vh, 0.8rem);
     font-weight: 700; color: #0c1929;
@@ -146,8 +148,7 @@
     z-index: 2;           /* 确保不被遮挡 */
     background: var(--gradient-sidebar); /* 防止透视 */
   }
-
-.lang-toggle {
+  .lang-toggle {
     display: flex;
     flex-direction: row;            /* 改为水平排列，实现“一行双列” */
     align-items: center;
@@ -155,8 +156,8 @@
     border-radius: 7px;
     padding: 3px;
     gap: 4px;
-}
-.lang-btn-side {
+  }
+  .lang-btn-side {
     flex: 1;                        /* 两个按钮均分宽度，形成并排双列效果 */
     display: flex;
     align-items: center;
@@ -171,42 +172,10 @@
     font-size: clamp(0.68rem, 1vh, 0.8rem);
     color: var(--gray-700);
     white-space: nowrap;            /* 文字禁止换行，保证双列紧凑 */
-}
-   
-  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-  .user-name-top {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #0c1929;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .user-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .user-role { font-size: 0.68rem; color: var(--gray-600); font-weight: 500; white-space: nowrap; }
-  .user-store-badge {
-    background: rgba(14, 116, 144, 0.12);
-    border: 1px solid rgba(14, 116, 144, 0.25);
-    color: var(--primary);
-    font-size: 0.6rem;
-    padding: 2px 8px;
-    border-radius: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  @media (max-width: 768px) {
-    .sidebar-user { padding: 10px 12px; gap: 8px; }
-    .user-av { width: 32px; height: 32px; font-size: 0.7rem; }
-    .user-name-top { font-size: 0.8rem; }
-    .user-role { font-size: 0.62rem; }
-    .user-store-badge { font-size: 0.55rem; padding: 1px 6px; }
-  }
-
-
-
-
+  .lang-btn-side:hover { background: rgba(14, 116, 144, 0.2); }
+  .lang-btn-side:active { transform: scale(0.98); }
+  .lang-btn-side.active-lang { background: rgba(14, 116, 144, 0.35); color: var(--primary); border-color: rgba(14, 116, 144, 0.5); }
 
   /* 顶部栏：手机端显示，桌面端隐藏（侧边栏已有相同信息） */
   .dash-topbar { display: none; }
