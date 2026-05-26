@@ -146,26 +146,33 @@
     z-index: 2;           /* 确保不被遮挡 */
     background: var(--gradient-sidebar); /* 防止透视 */
   }
-  .lang-toggle {
-    display: flex; flex-direction: column; align-items: stretch;
-    background: rgba(14, 116, 144, 0.1); border-radius: 7px;
-    padding: 3px; gap: 4px;
-  }
-  .lang-btn-side {
-    display: block; padding: clamp(1px, 0.3vh, 2px) 8px;
-    text-align: center; border-radius: 5px;
-    background: transparent; border: 1px solid transparent;
+
+.lang-toggle {
+    display: flex;
+    flex-direction: row;            /* 改为水平排列，实现“一行双列” */
+    align-items: center;
+    background: rgba(14, 116, 144, 0.1);
+    border-radius: 7px;
+    padding: 3px;
+    gap: 4px;
+}
+.lang-btn-side {
+    flex: 1;                        /* 两个按钮均分宽度，形成并排双列效果 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(1px, 0.3vh, 2px) 4px;
+    text-align: center;
+    border-radius: 5px;
+    background: transparent;
+    border: 1px solid transparent;
     transition: background 0.2s, transform 0.1s;
-    cursor: pointer; font-size: clamp(0.68rem, 1vh, 0.8rem);
+    cursor: pointer;
+    font-size: clamp(0.68rem, 1vh, 0.8rem);
     color: var(--gray-700);
-  }
-  .lang-btn-side:hover { background: rgba(14, 116, 144, 0.2); }
-  .lang-btn-side:active { transform: scale(0.98); }
-  .lang-btn-side.active-lang { background: rgba(14, 116, 144, 0.35); color: var(--primary); border-color: rgba(14, 116, 144, 0.5); }
-
-
-
-
+    white-space: nowrap;            /* 文字禁止换行，保证双列紧凑 */
+}
+   
   .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .user-name-top {
     font-size: 0.8rem;
