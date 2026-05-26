@@ -1232,9 +1232,9 @@
 
         try {
             // 步骤1：批量修复订单费用
-            updateProgress(lang === 'id' ? '同步订单费用' : '同步订单费用', 0, 1, lang === 'id' ? 'Mempersiapkan...' : '准备中...');
+            updateProgress(lang === 'id' ? 'Sinkronisasi Biaya Pesanan' : '同步订单费用', 0, 1, lang === 'id' ? 'Mempersiapkan...' : '准备中...');
             finalResult = await SUPABASE.batchRepairAllOrderFees(function(p) {
-                updateProgress(lang === 'id' ? '同步订单费用' : '同步订单费用', p.current, p.total, p.orderId);
+                updateProgress(lang === 'id' ? 'Sinkronisasi Biaya Pesanan' : '同步订单费用', p.current, p.total, p.orderId);
             });
 
             // 步骤2：诊断并清理孤立/重复流水

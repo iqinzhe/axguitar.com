@@ -363,7 +363,7 @@
                                             dateEl.max=maxD;
                                             if(dateEl.value>maxD) dateEl.value=maxD;
                                             var hint=document.getElementById('interestDateHint');
-                                            if(hint) hint.textContent=m>1?'💡 ${lang === 'id' ? '预付' : '预付'} '+m+' ${lang === 'id' ? '期，入账日期可为未来' : '期，入账日期可选未来'}':'💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}';
+                                            if(hint) hint.textContent=m>1?'💡 ${lang === 'id' ? 'Prabayar' : '预付'} '+m+' ${lang === 'id' ? '期，入账日期可为未来' : '期，入账日期可选未来'}':'💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}';
                                         })()">
                                             <option value="1">1 ${lang === 'id' ? 'bulan (normal)' : '期（本期）'}</option>
                                             <option value="2">2 ${lang === 'id' ? 'bulan (bayar muka 1 bln)' : '期（预付1期）'}</option>
@@ -576,6 +576,7 @@
                         }));
                     }
                 }
+                if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('payInterestWithMethod error:', error);
@@ -816,7 +817,6 @@
                 const printWindow = window.open('', '_blank');
                 const printDateTime = new Date().toLocaleString();
                 const userName = AUTH.user?.name || '-';
-                const storeAddress = '';
                 printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>

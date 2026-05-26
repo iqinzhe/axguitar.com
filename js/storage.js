@@ -388,14 +388,14 @@
                     overdue:   lang === 'id' ? '已逾期'  : '已逾期',
                     liquidated:lang === 'id' ? '已变卖'  : '已变卖',
                 };
-                const yesNo = (v) => v ? (lang === 'id' ? '是' : '是') : (lang === 'id' ? '否' : '否');
+                const yesNo = (v) => v ? (lang === 'id' ? 'Ya' : '是') : (lang === 'id' ? 'Tidak' : '否');
                 const feeStatus = (amount, paid) => {
-                    if (!amount || amount === 0) return lang === 'id' ? '免除' : '免除';
-                    return paid ? (lang === 'id' ? '已缴' : '已缴') : (lang === 'id' ? '未缴' : '未缴');
+                    if (!amount || amount === 0) return lang === 'id' ? 'Gratis' : '免除';
+                    return paid ? (lang === 'id' ? 'Lunas' : '已缴') : (lang === 'id' ? 'Belum' : '未缴');
                 };
                 const svcStatus = (amount, paid) => {
-                    if (!amount || amount === 0) return lang === 'id' ? '免除' : '免除';
-                    return (paid || 0) >= (amount || 0) ? (lang === 'id' ? '已缴' : '已缴') : (lang === 'id' ? '未缴' : '未缴');
+                    if (!amount || amount === 0) return lang === 'id' ? 'Gratis' : '免除';
+                    return (paid || 0) >= (amount || 0) ? (lang === 'id' ? 'Lunas' : '已缴') : (lang === 'id' ? 'Belum' : '未缴');
                 };
                 const fmtAmt = (v) => (!v || v === 0) ? '0' : String(v);
                 const fmtDate = (v) => v ? String(v).substring(0, 10) : '-';
@@ -429,14 +429,14 @@
                     fmtAmt(o.loan_amount),
                     o.agreed_interest_rate ? (o.agreed_interest_rate * 100).toFixed(1) : '10.0',
                     // 管理费：金额为0显示"免除"，否则显示金额
-                    (!o.admin_fee || o.admin_fee === 0) ? (lang === 'id' ? '免除' : '免除') : fmtAmt(o.admin_fee),
+                    (!o.admin_fee || o.admin_fee === 0) ? (lang === 'id' ? 'Gratis' : '免除') : fmtAmt(o.admin_fee),
                     feeStatus(o.admin_fee, o.admin_fee_paid),
                     // 服务费：金额为0显示"免除"
-                    (!o.service_fee_amount || o.service_fee_amount === 0) ? (lang === 'id' ? '免除' : '免除') : fmtAmt(o.service_fee_amount),
+                    (!o.service_fee_amount || o.service_fee_amount === 0) ? (lang === 'id' ? 'Gratis' : '免除') : fmtAmt(o.service_fee_amount),
                     o.service_fee_percent ? o.service_fee_percent + '%' : '0%',
                     svcStatus(o.service_fee_amount, o.service_fee_paid),
                     fmtAmt(o.monthly_fixed_payment || 0),
-                    o.repayment_type === 'fixed' ? (lang === 'id' ? '固定' : '固定') : (lang === 'id' ? '灵活' : '灵活'),
+                    o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Bebas' : '灵活'),
                     o.repayment_term || '-',
                     o.interest_paid_months || 0,
                     fmtAmt(o.interest_paid_total || 0),

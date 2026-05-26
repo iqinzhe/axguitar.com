@@ -156,7 +156,7 @@
                 '<span class="action-bar-divider"></span>' +
                 '<div class="action-bar-section action-bar-section--filter">' +
                 filterSelectHtml +
-                '<span id="selectedOrderDisplay" class="selected-order-display">' + (lang === 'id' ? '未选择任何订单' : '未选择任何订单') + '</span>' +
+                '<span id="selectedOrderDisplay" class="selected-order-display">' + (lang === 'id' ? 'Belum ada pesanan dipilih' : '未选择任何订单') + '</span>' +
                 '</div>' +
                 '<span class="action-bar-divider"></span>' +
                 '<div class="action-bar-section action-bar-section--view">' +
@@ -264,7 +264,7 @@
             if (!state) return;
             var lang = Utils.lang;
             var paginator = document.getElementById('orderTablePaginator');
-            if (paginator) paginator.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? '加载中...' : '加载中...') + '</div>';
+            if (paginator) paginator.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</div>';
             try {
                 var html = await JF.OrdersPage.buildOrderTableHTML(state.filters, page, state.pageSize);
                 var newHtmlDiv = document.createElement('div');
@@ -384,7 +384,7 @@
                     window._orderTableState.selectedOrderStatus = selectedRow.dataset.orderStatus;
                 }
             } else {
-                displaySpan.textContent = lang === 'id' ? '未选择任何订单' : '未选择任何订单';
+                displaySpan.textContent = lang === 'id' ? 'Belum ada pesanan dipilih' : '未选择任何订单';
                 displaySpan.style.color = 'var(--primary)';
                 displaySpan.style.background = '';
                 if (window._orderTableState) {
@@ -439,14 +439,14 @@
         _globalViewOrder: async function() {
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
-            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先点击选中一个订单' : '请先点击选中一个订单'); return; }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan terlebih dahulu' : '请先点击选中一个订单'); return; }
             await this.viewOrder(orderId);
         },
 
         _globalPrintOrder: async function() {
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
-            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             await this.printOrder(orderId);
         },
 
@@ -454,14 +454,14 @@
             var lang = Utils.lang;
             var orderId = this._getSelectedOrderId();
             var orderStatus = this._getSelectedOrderStatus();
-            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             if (!this._canPayOrder(orderStatus, PERMISSION.isAdmin())) {
-                Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以缴费' : '只有进行中的订单可以缴费');
+                Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat dibayar' : '只有进行中的订单可以缴费');
                 return;
             }
             var isOverdue = this._getSelectedIsOverdue();
             if (isOverdue) {
-                var confirmMsg = lang === 'id' ? '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？' : '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？';
+                var confirmMsg = lang === 'id' ? '⚠️ Pesanan terlambat. Pembayaran akan mencakup bunga tertunggak. Lanjutkan?' : '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？';
                 var ok = await Utils.toast.confirm(confirmMsg);
                 if (!ok) return;
             }
@@ -471,30 +471,30 @@
         _globalEditOrder: async function() {
             var lang = Utils.lang;
             var isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) { Utils.toast.warning(lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单'); return; }
+            if (!isAdmin) { Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengedit pesanan' : '仅管理员可修改订单'); return; }
             var orderId = this._getSelectedOrderId();
             var orderStatus = this._getSelectedOrderStatus();
-            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             if (!this._canEditOrder(orderStatus, true)) {
-                Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以修改' : '只有进行中的订单可以修改');
+                Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat diedit' : '只有进行中的订单可以修改');
                 return;
             }
             if (JF.AdminEditOrder && JF.AdminEditOrder.adminEditOrder) {
                 await JF.AdminEditOrder.adminEditOrder(orderId);
             } else {
-                Utils.toast.error(lang === 'id' ? '编辑功能不可用' : '编辑功能不可用');
+                Utils.toast.error(lang === 'id' ? 'Fitur edit tidak tersedia' : '编辑功能不可用');
             }
         },
 
         _globalDeleteOrder: async function() {
             var lang = Utils.lang;
             var isAdmin = PERMISSION.isAdmin();
-            if (!isAdmin) { Utils.toast.warning(lang === 'id' ? '仅管理员可删除订单' : '仅管理员可删除订单'); return; }
+            if (!isAdmin) { Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pesanan' : '仅管理员可删除订单'); return; }
             var orderId = this._getSelectedOrderId();
             var orderStatus = this._getSelectedOrderStatus();
-            if (!orderId) { Utils.toast.warning(lang === 'id' ? '请先选中一个订单' : '请先选中一个订单'); return; }
+            if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             if (!this._canDeleteOrder(orderStatus, true)) {
-                Utils.toast.warning(lang === 'id' ? '只有进行中的订单可以删除' : '只有进行中的订单可以删除');
+                Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat dihapus' : '只有进行中的订单可以删除');
                 return;
             }
             await this.deleteOrder(orderId);
@@ -546,7 +546,7 @@
             var loadMoreBtn = document.querySelector('#loadMoreRow button');
             if (loadMoreBtn) {
                 loadMoreBtn.disabled = true;
-                loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? '加载中...' : '加载中...');
+                loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...');
             }
             try {
                 var result = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
@@ -561,9 +561,9 @@
                 console.error("loadMoreOrders error:", err);
                 if (loadMoreBtn) {
                     loadMoreBtn.disabled = false;
-                    loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? '加载更多' : '加载更多');
+                    loadMoreBtn.textContent = '⬇️ ' + (lang === 'id' ? 'Muat lebih banyak' : '加载更多');
                 }
-                Utils.toast.error(lang === 'id' ? '加载更多失败' : '加载更多失败');
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat lebih banyak' : '加载更多失败');
             }
         },
 
@@ -580,7 +580,7 @@
             var lang = Utils.lang;
             if (state.currentFrom < state.totalCount) {
                 var remaining = state.totalCount - state.currentFrom;
-                var btn = '<button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? '加载更多' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? '剩余' : '剩余') + ')</button>';
+                var btn = '<button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? 'Muat lebih banyak' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')</button>';
                 var row = document.createElement('tr');
                 row.id = 'loadMoreRow';
                 row.innerHTML = '<td colspan="' + state.totalCols + '" style="text-align:center;padding:14px;">' + btn + '</td>';
@@ -635,21 +635,21 @@
                 var storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
-                    roleText = AUTH.isAdmin() ? (lang === 'id' ? '管理员' : '管理员') :
-                               AUTH.isStoreManager() ? (lang === 'id' ? '店长' : '店长') : 
-                               (lang === 'id' ? '员工' : '员工');
+                    roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                               AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') : 
+                               (lang === 'id' ? 'Staf' : '员工');
                     userName = AUTH.user ? (AUTH.user.name || '-') : '-';
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 var printDateTime = new Date().toLocaleString();
                 var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
                 var monthlyRate = order.agreed_interest_rate || 0.10;
                 var currentMonthlyInterest = remainingPrincipal * monthlyRate;
-                var statusText = order.status === 'active' ? (lang === 'id' ? '进行中' : '进行中') :
-                                   order.status === 'completed' ? (lang === 'id' ? '已结清' : '已结清') :
-                                   (lang === 'id' ? '已变卖' : '已变卖');
+                var statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
+                                   order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
+                                   (lang === 'id' ? 'Dijual' : '已变卖');
                 var isFixed = order.repayment_type === 'fixed';
-                var repaymentText = isFixed ? (lang === 'id' ? '固定还款' : '固定还款') :
-                                     (lang === 'id' ? '灵活还款' : '灵活还款');
+                var repaymentText = isFixed ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
+                                     (lang === 'id' ? 'Cicilan Bebas' : '灵活还款');
 
                 // 建立订单日期
                 var printOrderStartDate = order.custom_order_date
@@ -717,14 +717,14 @@
                             '</tr>';
                     }
                 } else {
-                    paymentRows = '<tr><td colspan="5" class="text-center">' + (lang === 'id' ? '无' : '无') + '</td></tr>';
+                    paymentRows = '<tr><td colspan="5" class="text-center">' + (lang === 'id' ? 'Tidak ada' : '无') + '</td></tr>';
                 }
                 var printWindow = window.open('', '_blank');
-                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\n.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n.order-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; margin-bottom: 12px; }\n.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n.info-item .value { font-size: 9.5pt; font-weight: 500; color: #1e293b; }\n.info-disclaimer { font-size: 7.5pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; line-height: 1.5; }\n.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; }\n.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\ntable { width: 100%; border-collapse: collapse; margin: 6px 0; }\nthead { display: table-header-group; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; }\nth, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n.text-right { text-align: right; }\n.text-center { text-align: center; }\n@media print { @page { size: A4; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n<h1 class="page-title">📄 ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + '</h1>\n<div class="card">\n<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>\n' + orderInfoGrid + '\n<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>\n<table>\n<thead>\n<tr>\n<th>' + t('date') + '</th>\n<th>' + t('type') + '</th>\n<th class="text-right">' + t('amount') + '</th>\n<th>' + t('payment_method') + '</th>\n<th>' + t('description') + '</th>\n</tr>\n</thead>\n<tbody>' + paymentRows + '</tbody>\n</table>\n</div>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
+                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\n.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n.order-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; margin-bottom: 12px; }\n.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n.info-item .value { font-size: 9.5pt; font-weight: 500; color: #1e293b; }\n.info-disclaimer { font-size: 7.5pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; line-height: 1.5; }\n.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; }\n.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\ntable { width: 100%; border-collapse: collapse; margin: 6px 0; }\nthead { display: table-header-group; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; }\nth, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n.text-right { text-align: right; }\n.text-center { text-align: center; }\n@media print { @page { size: A4; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? 'Pusat' : '总部') : (lang === 'id' ? 'Toko: ' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n<h1 class="page-title">📄 ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + '</h1>\n<div class="card">\n<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>\n' + orderInfoGrid + '\n<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>\n<table>\n<thead>\n<tr>\n<th>' + t('date') + '</th>\n<th>' + t('type') + '</th>\n<th class="text-right">' + t('amount') + '</th>\n<th>' + t('payment_method') + '</th>\n<th>' + t('description') + '</th>\n</tr>\n</thead>\n<tbody>' + paymentRows + '</tbody>\n</table>\n</div>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
                 console.error("printOrder error:", error);
-                Utils.toast.error(Utils.lang === 'id' ? '打印订单失败' : '打印订单失败');
+                Utils.toast.error(Utils.lang === 'id' ? 'Gagal mencetak pesanan' : '打印订单失败');
             }
         },
 
@@ -757,7 +757,7 @@
                             '<td>' + Utils.escapeHtml(p2.orders ? p2.orders.customer_name : '-') + '</td>' +
                             '<td class="date-cell">' + Utils.formatDate(p2.date) + '</td>' +
                             '<td>' + (typeMap[p2.type] || p2.type) + '</td>' +
-                            '<td class="text-center">' + (p2.months ? p2.months + (lang === 'id' ? ' 个月' : ' 个月') : '-') + '</td>' +
+                            '<td class="text-center">' + (p2.months ? p2.months + (lang === 'id' ? ' bln' : ' 个月') : '-') + '</td>' +
                             '<td class="amount">' + Utils.formatCurrency(p2.amount) + '</td>' +
                             '<td class="text-center"><span class="badge badge--' + methodClass + '">' + (methodMap[p2.payment_method] || '-') + '</span></td>' +
                             '<td class="desc-cell">' + Utils.escapeHtml(p2.description || '-') + '</td>' +
@@ -771,19 +771,19 @@
                     '<div class="card card--stat"><div class="stat-value income">' + Utils.formatCurrency(totalServiceFee) + '</div><div class="stat-label">' + t('service_fee') + '</div></div>' +
                     '<div class="card card--stat"><div class="stat-value income">' + Utils.formatCurrency(totalInterest) + '</div><div class="stat-label">' + t('interest') + '</div></div>' +
                     '<div class="card card--stat"><div class="stat-value">' + Utils.formatCurrency(totalPrincipal) + '</div><div class="stat-label">' + t('principal') + '</div></div>' +
-                    '<div class="card card--stat"><div class="stat-value">' + Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal) + '</div><div class="stat-label">' + (lang === 'id' ? '全部总计' : '全部总计') + '</div></div>' +
+                    '<div class="card card--stat"><div class="stat-value">' + Utils.formatCurrency(totalAdminFee + totalServiceFee + totalInterest + totalPrincipal) + '</div><div class="stat-label">' + (lang === 'id' ? 'Total Semua' : '全部总计') + '</div></div>' +
                     '</div>' +
                     '<div class="card">' +
                     '<div class="table-container">' +
                     '<table class="data-table payment-table">' +
-                    '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? '月数' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? '支付方式' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
+                    '<thead><tr><th class="col-id">' + t('order_id') + '</th><th class="col-name">' + t('customer_name') + '</th><th class="col-date">' + t('date') + '</th><th class="col-type">' + t('type') + '</th><th class="col-months text-center">' + (lang === 'id' ? 'Bulan' : '月数') + '</th><th class="col-amount amount">' + t('amount') + '</th><th class="col-method text-center">' + (lang === 'id' ? 'Metode Bayar' : '支付方式') + '</th><th class="col-desc">' + t('description') + '</th></tr></thead>' +
                     '<tbody>' + rows + '</tbody>' +
                     '</table>' +
                     '</div>' +
                     '</div>';
             } catch (error) {
                 console.error("showPaymentHistory error:", error);
-                Utils.toast.error(lang === 'id' ? '加载缴费记录失败' : '加载缴费记录失败');
+                Utils.toast.error(lang === 'id' ? 'Gagal memuat riwayat pembayaran' : '加载缴费记录失败');
             }
         },
 
@@ -794,14 +794,14 @@
             var filters = { status: APP.currentFilter || 'all' };
             try {
                 var MAX_PRINT_ORDERS = 500;
-                Utils.toast.info(lang === 'id' ? '⏳ 正在准备打印数据...' : '⏳ 正在准备打印数据...', 2000);
+                Utils.toast.info(lang === 'id' ? '⏳ Mempersiapkan data cetak...' : '⏳ 正在准备打印数据...', 2000);
                 var result = await this._fetchOrderData(filters, 0, MAX_PRINT_ORDERS);
                 var orders = result.orders;
                 var totalCount = result.totalCount;
                 if (totalCount > MAX_PRINT_ORDERS) {
                     Utils.toast.warning(lang === 'id' ? '⚠️ 仅打印前 ' + MAX_PRINT_ORDERS + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '⚠️ 仅打印前 ' + MAX_PRINT_ORDERS + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。', 5000);
                 }
-                if (orders.length === 0) { Utils.toast.warning(lang === 'id' ? '没有可打印的数据' : '没有可打印的数据'); return; }
+                if (orders.length === 0) { Utils.toast.warning(lang === 'id' ? 'Tidak ada data untuk dicetak' : '没有可打印的数据'); return; }
                 var stores = await SUPABASE.getAllStores();
                 var storeMap = {};
                 for (var sIdx = 0; sIdx < stores.length; sIdx++) { var s = stores[sIdx]; storeMap[s.id] = s.name; }
@@ -813,7 +813,7 @@
                         : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
                     var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
                     var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
-                    var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? '固定' : '固定') : (lang === 'id' ? '灵活' : '灵活');
+                    var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Bebas' : '灵活');
                     var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
                     var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
                     var statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
@@ -825,7 +825,7 @@
                         '<td>' + Utils.escapeHtml(o.collateral_name) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(o.loan_amount) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(currentMonthlyInterest) + '</td>' +
-                        '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + '</td>' +
+                        '<td class="text-center">' + o.interest_paid_months + ' ' + (lang === 'id' ? 'bulan' : '个月') + '</td>' +
                         '<td class="text-center">' + repaymentTypeText + '</td>' +
                         '<td class="text-center">' + adminFeeStatus + '</td>' +
                         '<td class="text-center">' + serviceFeeStatus + '</td>' +
@@ -851,18 +851,18 @@
                 var storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
-                    roleText = AUTH.isAdmin() ? (lang === 'id' ? '管理员' : '管理员') :
-                               AUTH.isStoreManager() ? (lang === 'id' ? '店长' : '店长') :
-                               (lang === 'id' ? '员工' : '员工');
+                    roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
+                               AUTH.isStoreManager() ? (lang === 'id' ? 'Manajer Toko' : '店长') :
+                               (lang === 'id' ? 'Staf' : '员工');
                     userName = AUTH.user ? (AUTH.user.name || '-') : '-';
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
                 var printDateTime = new Date().toLocaleString();
                 var printWindow = window.open('', '_blank');
-                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Daftar Pesanan' : '订单列表') + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\ntable { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\ntd { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nthead { display: table-header-group; }\n.amount { text-align: right; }\n.text-center { text-align: center; }\ncol.col-id       { width: 14mm; }\ncol.col-start    { width: 16mm; }\ncol.col-customer { width: 24mm; }\ncol.col-phone    { width: 22mm; }\ncol.col-collat   { width: 24mm; }\ncol.col-loan     { width: 20mm; }\ncol.col-interest { width: 18mm; }\ncol.col-paid     { width: 12mm; }\ncol.col-type     { width: 11mm; }\ncol.col-status   { width: 12mm; }\ncol.col-store    { width: 16mm; }\n.print-warning { background: #fef3c7; color: #d97706; padding: 8px; margin-bottom: 12px; border-radius: 4px; font-size: 8pt; text-align: center; }\n@media print { @page { size: A4 landscape; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? '总部' : '总部') : (lang === 'id' ? '门店：' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n' + (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '</div>\n' : '') + '<div class="page-title">📋 ' + (lang === 'id' ? 'Daftar Pesanan' : '订单列表') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? '共' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? '条' : '条') + '</small></div>\n<table>\n<colgroup>\n<col class="col-id">\n<col class="col-start">\n<col class="col-customer">\n<col class="col-phone">\n<col class="col-collat">\n<col class="col-loan">\n<col class="col-interest">\n<col class="col-paid">\n<col class="col-type">\n<col class="col-status">\n<col class="col-status">\n<col class="col-status">\n' + (isAdmin ? '<col class="col-store">' : '') + '\n</colgroup>\n<thead>' + headerHtml + '</thead>\n<tbody>' + rows + '</tbody>\n</table>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
+                printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Daftar Pesanan' : '订单列表') + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\ntable { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\ntd { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nthead { display: table-header-group; }\n.amount { text-align: right; }\n.text-center { text-align: center; }\ncol.col-id       { width: 14mm; }\ncol.col-start    { width: 16mm; }\ncol.col-customer { width: 24mm; }\ncol.col-phone    { width: 22mm; }\ncol.col-collat   { width: 24mm; }\ncol.col-loan     { width: 20mm; }\ncol.col-interest { width: 18mm; }\ncol.col-paid     { width: 12mm; }\ncol.col-type     { width: 11mm; }\ncol.col-status   { width: 12mm; }\ncol.col-store    { width: 16mm; }\n.print-warning { background: #fef3c7; color: #d97706; padding: 8px; margin-bottom: 12px; border-radius: 4px; font-size: 8pt; text-align: center; }\n@media print { @page { size: A4 landscape; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? 'Pusat' : '总部') : (lang === 'id' ? 'Toko: ' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n' + (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '</div>\n' : '') + '<div class="page-title">📋 ' + (lang === 'id' ? 'Daftar Pesanan' : '订单列表') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? 'Total' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? 'data' : '条') + '</small></div>\n<table>\n<colgroup>\n<col class="col-id">\n<col class="col-start">\n<col class="col-customer">\n<col class="col-phone">\n<col class="col-collat">\n<col class="col-loan">\n<col class="col-interest">\n<col class="col-paid">\n<col class="col-type">\n<col class="col-status">\n<col class="col-status">\n<col class="col-status">\n' + (isAdmin ? '<col class="col-store">' : '') + '\n</colgroup>\n<thead>' + headerHtml + '</thead>\n<tbody>' + rows + '</tbody>\n</table>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
                 console.error('打印订单列表失败:', error);
-                Utils.toast.error(lang === 'id' ? '打印订单列表失败' : '打印订单列表失败');
+                Utils.toast.error(lang === 'id' ? 'Gagal mencetak daftar pesanan' : '打印订单列表失败');
             }
         },
 
@@ -949,7 +949,7 @@
                     '</p>';
             } else {
                 repaymentInfoHtml =
-                    '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? '最长延期10个月' : '最长延期10个月') + ')</p>' +
+                    '<p><strong>' + t('repayment_type') + ':</strong> 💰 ' + t('flexible_repayment') + ' (' + (lang === 'id' ? 'Maks. perpanjangan 10 bulan' : '最长延期10个月') + ')</p>' +
                     '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>';
             }
 
@@ -964,7 +964,7 @@
                 '<div class="card">' +
                 '<div class="order-detail-grid">' +
                 '<div class="info-column">' +
-                '<h3>📋 ' + (lang === 'id' ? '订单信息' : '订单信息') + '</h3>' +
+                '<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>' +
                 '<p><strong>' + t('order_id') + ':</strong> ' + Utils.escapeHtml(order.order_id) + '</p>' +
                 '<p><strong>' + t('status') + ':</strong> <span class="badge badge--' + order.status + '">' + (statusMap[order.status] || order.status) + '</span></p>' +
                 repaymentInfoHtml +
@@ -978,13 +978,13 @@
                 '<h3>💎 ' + t('collateral_info') + '</h3>' +
                 '<p><strong>' + t('collateral_name') + ':</strong> ' + Utils.escapeHtml(order.collateral_name) + '</p>' +
                 '<p><strong>' + t('loan_amount') + ':</strong> ' + Utils.formatCurrency(order.loan_amount) + '</p>' +
-                '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? '费用明细' : '费用明细') + '</h3>' +
+                '<h3 style="margin-top:16px;">💰 ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') + '</h3>' +
                 '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' — ' + adminFeeStatus + '</p>' +
                 '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) — ' + serviceFeeStatus + '</p>' +
                 (order.repayment_type !== 'fixed' ?
-                    '<p><strong>' + (lang === 'id' ? '月利息（当前）' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? '基于剩余本金' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
-                    '<p><strong>' + (lang === 'id' ? '已付利息' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? '个月' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
-                    '<p><strong>' + (lang === 'id' ? '剩余本金' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Bunga Bulanan (Saat Ini)' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? 'Berdasarkan sisa pokok' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Bunga Terbayar' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? 'bulan' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
                     '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>'
                 :
                     '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>'
@@ -992,10 +992,10 @@
                 (order.repayment_type !== 'fixed' ? '<p><strong>' + t('notes') + ':</strong> ' + Utils.escapeHtml(order.notes || '-') + '</p>' : '') +
                 '</div>' +
                 '</div>' +
-                '<div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>' + (lang === 'id' ? '温馨提示：' : '温馨提示：') + '</strong> ' +
+                '<div class="info-bar info"><span class="info-bar-icon">💡</span><div class="info-bar-content"><strong>' + (lang === 'id' ? 'Catatan Penting:' : '温馨提示：') + '</strong> ' +
                 (order.repayment_type === 'fixed'
                     ? (lang === 'id' ? 'Setiap angsuran mencakup bunga dan pokok. Pelunasan dipercepat dapat mengurangi sisa bunga.' : '每期还款已包含本金和利息，提前结清可减免剩余利息。')
-                    : (lang === 'id' ? '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。')
+                    : (lang === 'id' ? 'Harap bayar bunga sebelum tanggal jatuh tempo setiap bulan. Pelunasan pokok lebih awal dapat mengurangi beban bunga.' : '请于每月到期日前支付利息。提前偿还本金可有效减少利息负担，结清后系统将自动生成结清凭证。')
                 ) + '</div></div>' +
                 '<div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px;">' +
                 '<div style="flex: 1; min-width: 280px;">' +
@@ -1010,9 +1010,9 @@
                 '</div>' +
                 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;" class="no-print">' +
                 '<button onclick="APP.navigateTo(\'orderTable\')" class="btn btn--outline">↩️ ' + t('back') + '</button>' +
-                (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeHtml(order.order_id) + '\'})" class="btn btn--success">💸 ' + (lang === 'id' ? '缴纳费用' : '缴纳费用') + '</button>' : '') +
-                (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--success">🧾 ' + (lang === 'id' ? '结清凭证' : '结清凭证') + '</button>' : '') +
-                '<button onclick="APP.sendWAReminder(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--warning">📱 ' + (lang === 'id' ? 'WA提醒' : 'WA提醒') + '</button>' +
+                (order.status === 'active' && !isAdmin ? '<button onclick="APP.navigateTo(\'payment\',{orderId:\'' + Utils.escapeHtml(order.order_id) + '\'})" class="btn btn--success">💸 ' + (lang === 'id' ? 'Bayar Biaya' : '缴纳费用') + '</button>' : '') +
+                (order.status === 'completed' ? '<button onclick="APP.printSettlementReceipt(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--success">🧾 ' + (lang === 'id' ? 'Bukti Lunas' : '结清凭证') + '</button>' : '') +
+                '<button onclick="APP.sendWAReminder(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--warning">📱 ' + (lang === 'id' ? 'Reminder WA' : 'WA提醒') + '</button>' +
                 (isAdmin ? '<button onclick="APP.repairOrderFees(\'' + Utils.escapeHtml(order.order_id) + '\')" class="btn btn--outline" style="border-color:#f59e0b;color:#b45309;" title="' + (lang === 'id' ? 'Bersihkan dan sinkronkan catatan biaya admin/layanan sesuai nilai di pesanan' : '清理并同步管理费/服务费流水，使其与订单数据保持一致') + '">🔧 ' + (lang === 'id' ? 'Perbaiki Biaya' : '修复费用流水') + '</button>' : '') +
                 '</div>' +
                 '</div>';
@@ -1092,7 +1092,7 @@
                 var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
                 var isInterest = p.type === 'interest';
                 var mthHtml = isInterest
-                    ? '<input type="number" id="' + mid + '_months" value="' + (p.months || 1) + '" min="1" max="12" step="1" style="width:60px;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;" title="' + (lang === 'id' ? '期数' : '期数') + '">'
+                    ? '<input type="number" id="' + mid + '_months" value="' + (p.months || 1) + '" min="1" max="12" step="1" style="width:60px;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;" title="' + (lang === 'id' ? 'Periode' : '期数') + '">'
                     : '<span style="color:var(--text-muted);font-size:12px;">—</span>';
                 var methodSel = '<select id="' + mid + '_method" style="padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;">' +
                     methodOpts.replace('value="' + p.payment_method + '"', 'value="' + p.payment_method + '" selected') +
@@ -1102,7 +1102,7 @@
                     '<td style="padding:7px 8px;"><input type="text" id="' + mid + '_amount" value="' + Utils.formatNumberWithCommas(p.amount || 0) + '" class="amount-input" style="width:130px;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;"></td>' +
                     '<td style="padding:7px 8px;">' + mthHtml + '</td>' +
                     '<td style="padding:7px 8px;">' + methodSel + '</td>' +
-                    '<td style="padding:7px 8px;"><input type="text" id="' + mid + '_desc" value="' + Utils.escapeHtml(p.description || '') + '" placeholder="' + (lang === 'id' ? '备注（可选）' : '备注（可选）') + '" style="width:100%;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;"></td>' +
+                    '<td style="padding:7px 8px;"><input type="text" id="' + mid + '_desc" value="' + Utils.escapeHtml(p.description || '') + '" placeholder="' + (lang === 'id' ? 'Catatan (opsional)' : '备注（可选）') + '" style="width:100%;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;"></td>' +
                     '<td style="padding:7px 8px;text-align:center;">' +
                     '<button onclick="JF.AdminEditOrder._deletePaymentRow(' + p.id + ')" style="background:var(--danger);color:#fff;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px;">🗑️</button>' +
                     '</td>' +
@@ -1110,35 +1110,35 @@
             }
 
             var iRows = interest.length ? interest.map(rowHtml).join('') :
-                '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? '暂无记录' : '暂无记录') + '</td></tr>';
+                '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? 'Belum ada catatan' : '暂无记录') + '</td></tr>';
             var pRows = principal.length ? principal.map(rowHtml).join('') :
-                '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? '暂无记录' : '暂无记录') + '</td></tr>';
+                '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? 'Belum ada catatan' : '暂无记录') + '</td></tr>';
 
             var thStyle = 'style="padding:7px 8px;background:var(--bg-hover);font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;"';
             var tableHead = '<thead><tr>' +
-                '<th ' + thStyle + '>' + (lang === 'id' ? '日期' : '日期') + '</th>' +
-                '<th ' + thStyle + '>' + (lang === 'id' ? '金额 (Rp)' : '金额 (Rp)') + '</th>' +
-                '<th ' + thStyle + '>' + (lang === 'id' ? '期数' : '期数') + '</th>' +
-                '<th ' + thStyle + '>' + (lang === 'id' ? '方式' : '方式') + '</th>' +
-                '<th ' + thStyle + '>' + (lang === 'id' ? '备注' : '备注') + '</th>' +
-                '<th ' + thStyle + '>' + (lang === 'id' ? '操作' : '操作') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? 'Jumlah (Rp)' : '金额 (Rp)') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? 'Periode' : '期数') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? 'Metode' : '方式') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? 'Catatan' : '备注') + '</th>' +
+                '<th ' + thStyle + '>' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
                 '</tr></thead>';
 
             var today = Utils.getLocalToday();
 
             return '<div class="form-section" id="payment_editor_section">' +
-                '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? '利息缴纳记录（逐条编辑）' : '利息缴纳记录（逐条编辑）') + '</div>' +
+                '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? 'Catatan Pembayaran Bunga (edit per baris)' : '利息缴纳记录（逐条编辑）') + '</div>' +
                 '<div style="overflow-x:auto;margin-bottom:10px;">' +
                 '<table style="width:100%;border-collapse:collapse;" id="interest_records_table">' +
                 tableHead + '<tbody id="interest_rows">' + iRows + '</tbody>' +
                 '</table></div>' +
-                '<button onclick="JF.AdminEditOrder._addPaymentRow(\'interest\')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;margin-bottom:18px;">＋ ' + (lang === 'id' ? '新增利息记录' : '新增利息记录') + '</button>' +
-                '<div class="form-section-title" style="margin-top:4px;"><span class="section-icon">🏦</span> ' + (lang === 'id' ? '返还本金记录（逐条编辑）' : '返还本金记录（逐条编辑）') + '</div>' +
+                '<button onclick="JF.AdminEditOrder._addPaymentRow(\'interest\')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;margin-bottom:18px;">＋ ' + (lang === 'id' ? 'Tambah Catatan Bunga' : '新增利息记录') + '</button>' +
+                '<div class="form-section-title" style="margin-top:4px;"><span class="section-icon">🏦</span> ' + (lang === 'id' ? 'Catatan Pengembalian Pokok (edit per baris)' : '返还本金记录（逐条编辑）') + '</div>' +
                 '<div style="overflow-x:auto;margin-bottom:10px;">' +
                 '<table style="width:100%;border-collapse:collapse;" id="principal_records_table">' +
                 tableHead + '<tbody id="principal_rows">' + pRows + '</tbody>' +
                 '</table></div>' +
-                '<button onclick="JF.AdminEditOrder._addPaymentRow(\'principal\')" style="background:var(--success);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">＋ ' + (lang === 'id' ? '新增本金记录' : '新增本金记录') + '</button>' +
+                '<button onclick="JF.AdminEditOrder._addPaymentRow(\'principal\')" style="background:var(--success);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">＋ ' + (lang === 'id' ? 'Tambah Catatan Pokok' : '新增本金记录') + '</button>' +
                 '</div>';
         },
 
@@ -1203,7 +1203,7 @@
 
         adminEditOrder: async function(orderId) {
             if (!PERMISSION.isAdmin()) {
-                Utils.toast.error(Utils.lang === 'id' ? '仅管理员可修改订单' : '仅管理员可修改订单');
+                Utils.toast.error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengedit pesanan' : '仅管理员可修改订单');
                 return;
             }
             var lang = Utils.lang;
@@ -1235,19 +1235,19 @@
 
                 document.getElementById('app').innerHTML =
                     '<div class="page-header">' +
-                    '<h2>✏️ ' + (lang === 'id' ? '修改订单' : '修改订单') + ' — ' + Utils.escapeHtml(orderId) + '</h2>' +
+                    '<h2>✏️ ' + (lang === 'id' ? 'Edit Pesanan' : '修改订单') + ' — ' + Utils.escapeHtml(orderId) + '</h2>' +
                     '<div class="header-actions">' +
                     '<button onclick="JF.AdminEditOrder.adminCancelEdit(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--outline">↩️ ' + t('cancel') + '</button>' +
                     '</div></div>' +
                     '<div class="card">' +
                     '<div class="info-bar warning"><span class="info-bar-icon">⚠️</span>' +
-                    '<div class="info-bar-content"><strong>' + (lang === 'id' ? '管理员编辑模式' : '管理员编辑模式') + '：</strong>' +
-                    (lang === 'id' ? '订单已临时解锁，保存后自动重新锁定。缴费记录的修改将直接影响利息/本金汇总统计。' : '订单已临时解锁，保存后自动重新锁定。缴费记录的修改将直接影响利息/本金汇总统计。') + '</div></div>' +
+                    '<div class="info-bar-content"><strong>' + (lang === 'id' ? 'Mode Edit Admin' : '管理员编辑模式') + '：</strong>' +
+                    (lang === 'id' ? 'Pesanan dibuka sementara, akan dikunci otomatis setelah disimpan. Perubahan catatan pembayaran akan langsung mempengaruhi ringkasan bunga/pokok.' : '订单已临时解锁，保存后自动重新锁定。缴费记录的修改将直接影响利息/本金汇总统计。') + '</div></div>' +
 
                     '<div class="form-section">' +
-                    '<div class="form-section-title"><span class="section-icon">📋</span> ' + (lang === 'id' ? '基本信息' : '基本信息') + '</div>' +
+                    '<div class="form-section-title"><span class="section-icon">📋</span> ' + (lang === 'id' ? 'Informasi Dasar' : '基本信息') + '</div>' +
                     '<div class="form-grid">' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '订单日期' : '订单日期') + '</label>' +
+                    '<div class="form-group"><label>' + (lang === 'id' ? 'Tanggal Pesanan' : '订单日期') + '</label>' +
                     '<input type="date" id="edit_order_date" value="' + orderDateStr + '" max="' + today + '"></div>' +
                     '<div class="form-group"><label>' + t('collateral_name') + '</label>' +
                     '<input type="text" id="edit_collateral" value="' + Utils.escapeHtml(order.collateral_name || '') + '"></div>' +
@@ -1271,7 +1271,7 @@
                     '</div></div>' +
 
                     '<div class="form-section">' +
-                    '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? '费用明细' : '费用明细') + '</div>' +
+                    '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? 'Rincian Biaya' : '费用明细') + '</div>' +
                     '<div class="form-grid">' +
                     '<div class="form-group"><label>' + t('admin_fee') + ' (Rp)</label>' +
                     '<input type="text" id="edit_admin_fee" class="amount-input" value="' + Utils.formatNumberWithCommas(order.admin_fee || 0) + '">' +
@@ -1281,7 +1281,7 @@
                     '<div class="form-hint">💡 ' + (lang === 'id' ? 'Isi 0 = Gratis' : '填0即为免费') + '</div></div>' +
                     '<div class="form-group"><label>' + t('service_fee') + ' %</label>' +
                     '<input type="number" id="edit_service_fee_percent" value="' + (order.service_fee_percent || 0) + '" min="0" max="10" step="0.5"></div>' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '月利率 (%)' : '月利率 (%)') + '</label>' +
+                    '<div class="form-group"><label>' + (lang === 'id' ? 'Suku Bunga Bulanan (%)' : '月利率 (%)') + '</label>' +
                     '<select id="edit_interest_rate">' + Utils.getInterestRateOptions((order.agreed_interest_rate || 0.10) * 100) + '</select></div>' +
                     '</div></div>' +
 
@@ -1293,34 +1293,34 @@
                     '<option value="flexible"' + (order.repayment_type === 'flexible' ? ' selected' : '') + '>' + t('flexible_repayment') + '</option>' +
                     '<option value="fixed"' + (order.repayment_type === 'fixed' ? ' selected' : '') + '>' + t('fixed_repayment') + '</option>' +
                     '</select></div>' +
-                    '<div class="form-group"><label>' + t('term_months') + ' ' + (lang === 'id' ? '（固定期数）' : '（固定期数）') + '</label>' +
-                    '<input type="number" id="edit_repayment_term" value="' + (order.repayment_term || '') + '" min="1" max="10" placeholder="' + (lang === 'id' ? '灵活还款可留空' : '灵活还款可留空') + '"></div>' +
+                    '<div class="form-group"><label>' + t('term_months') + ' ' + (lang === 'id' ? '(Cicilan Tetap)' : '（固定期数）') + '</label>' +
+                    '<input type="number" id="edit_repayment_term" value="' + (order.repayment_term || '') + '" min="1" max="10" placeholder="' + (lang === 'id' ? 'Kosongkan untuk cicilan bebas' : '灵活还款可留空') + '"></div>' +
                     '<div class="form-group"><label>' + t('monthly_payment') + ' (Rp)</label>' +
                     '<input type="text" id="edit_monthly_payment" class="amount-input" value="' + Utils.formatNumberWithCommas(order.monthly_fixed_payment || 0) + '"></div>' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '典当期限（月）' : '典当期限（月）') + '</label>' +
-                    '<input type="number" id="edit_pawn_term" value="' + (order.pawn_term_months || '') + '" min="1" max="36" placeholder="' + (lang === 'id' ? '无则留空' : '无则留空') + '"></div>' +
-                    '<div class="form-group"><label>' + (lang === 'id' ? '最大延期月数' : '最大延期月数') + '</label>' +
+                    '<div class="form-group"><label>' + (lang === 'id' ? 'Masa Gadai (Bulan)' : '典当期限（月）') + '</label>' +
+                    '<input type="number" id="edit_pawn_term" value="' + (order.pawn_term_months || '') + '" min="1" max="36" placeholder="' + (lang === 'id' ? 'Kosongkan jika tidak ada' : '无则留空') + '"></div>' +
+                    '<div class="form-group"><label>' + (lang === 'id' ? 'Maks. Bulan Perpanjangan' : '最大延期月数') + '</label>' +
                     '<input type="number" id="edit_max_extension" value="' + (order.max_extension_months || 10) + '" min="1" max="36"></div>' +
                     '</div></div>' +
 
                     '<div class="form-section">' +
-                    '<div class="form-section-title"><span class="section-icon">💳</span> ' + (lang === 'id' ? '费用缴纳状态' : '费用缴纳状态') + '</div>' +
+                    '<div class="form-section-title"><span class="section-icon">💳</span> ' + (lang === 'id' ? 'Status Pembayaran Biaya' : '费用缴纳状态') + '</div>' +
                     '<div class="form-grid">' +
-                    '<div class="form-group"><label>' + t('admin_fee') + ' ' + (lang === 'id' ? '已缴？' : '已缴？') + '</label>' +
+                    '<div class="form-group"><label>' + t('admin_fee') + ' ' + (lang === 'id' ? 'Sudah Dibayar?' : '已缴？') + '</label>' +
                     '<select id="edit_admin_fee_paid">' +
-                    '<option value="true"' + (order.admin_fee_paid ? ' selected' : '') + '>' + (lang === 'id' ? '✅ 已缴' : '✅ 已缴') + '</option>' +
-                    '<option value="false"' + (!order.admin_fee_paid ? ' selected' : '') + '>' + (lang === 'id' ? '❌ 未缴' : '❌ 未缴') + '</option>' +
+                    '<option value="true"' + (order.admin_fee_paid ? ' selected' : '') + '>' + (lang === 'id' ? '✅ Sudah' : '✅ 已缴') + '</option>' +
+                    '<option value="false"' + (!order.admin_fee_paid ? ' selected' : '') + '>' + (lang === 'id' ? '❌ Belum' : '❌ 未缴') + '</option>' +
                     '</select></div>' +
                     '</div></div>' +
 
                     paymentEditorHtml +
 
                     '<div class="info-bar info" style="margin-top:4px;"><span class="info-bar-icon">💡</span>' +
-                    '<div class="info-bar-content">' + (lang === 'id' ? '保存后，系统将根据以上缴费记录自动重新计算：已付利息期数、已付利息总额、已还本金、剩余本金、订单状态。' : '保存后，系统将根据以上缴费记录自动重新计算：已付利息期数、已付利息总额、已还本金、剩余本金、订单状态。') + '</div></div>' +
+                    '<div class="info-bar-content">' + (lang === 'id' ? 'Setelah disimpan, sistem akan menghitung ulang otomatis: jumlah bunga terbayar, total bunga, pokok terbayar, sisa pokok, dan status pesanan.' : '保存后，系统将根据以上缴费记录自动重新计算：已付利息期数、已付利息总额、已还本金、剩余本金、订单状态。') + '</div></div>' +
 
                     '<div class="form-actions">' +
                     '<button onclick="JF.AdminEditOrder.adminSaveOrder(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--success" id="adminSaveBtn">' +
-                    '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定') +
+                    '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定') +
                     '</button>' +
                     '<button onclick="JF.AdminEditOrder.adminCancelEdit(\'' + Utils.escapeHtml(orderId) + '\')" class="btn btn--outline">↩️ ' + t('cancel') + '</button>' +
                     '</div></div>';
@@ -1333,18 +1333,18 @@
 
             } catch (error) {
                 console.error('adminEditOrder error:', error);
-                Utils.toast.error(error.message || (Utils.lang === 'id' ? '打开订单失败' : '打开订单失败'));
+                Utils.toast.error(error.message || (Utils.lang === 'id' ? 'Gagal membuka pesanan' : '打开订单失败'));
             }
         },
 
         adminSaveOrder: async function(orderId) {
             if (!PERMISSION.isAdmin()) {
-                Utils.toast.error(Utils.lang === 'id' ? '仅管理员可保存修改' : '仅管理员可保存修改');
+                Utils.toast.error(Utils.lang === 'id' ? 'Hanya admin yang dapat menyimpan perubahan' : '仅管理员可保存修改');
                 return;
             }
             var lang = Utils.lang;
             var saveBtn = document.getElementById('adminSaveBtn');
-            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? '保存中...' : '保存中...'); }
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...'); }
             try {
                 var loanAmount   = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount') ? document.getElementById('edit_loan_amount').value : null) || 0;
                 var adminFee     = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee') ? document.getElementById('edit_admin_fee').value : null) || 0;
@@ -1366,8 +1366,8 @@
                 var notes        = document.getElementById('edit_notes') ? document.getElementById('edit_notes').value.trim() : '';
 
                 if (!collateral || loanAmount <= 0) {
-                    Utils.toast.warning(lang === 'id' ? '抵押物和贷款金额不能为空' : '抵押物和贷款金额不能为空');
-                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); }
+                    Utils.toast.warning(lang === 'id' ? 'Nama jaminan dan jumlah pinjaman tidak boleh kosong' : '抵押物和贷款金额不能为空');
+                    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
                     return;
                 }
 
@@ -1375,8 +1375,8 @@
                 var allRecs = payEdits.toUpdate.concat(payEdits.toAdd);
                 for (var ri = 0; ri < allRecs.length; ri++) {
                     var rec = allRecs[ri];
-                    if (!rec.date) { Utils.toast.warning(lang === 'id' ? '缴费记录日期不能为空' : '缴费记录日期不能为空'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); } return; }
-                    if (!rec.amount || rec.amount <= 0) { Utils.toast.warning(lang === 'id' ? '缴费记录金额必须大于0' : '缴费记录金额必须大于0'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); } return; }
+                    if (!rec.date) { Utils.toast.warning(lang === 'id' ? 'Tanggal catatan pembayaran tidak boleh kosong' : '缴费记录日期不能为空'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); } return; }
+                    if (!rec.amount || rec.amount <= 0) { Utils.toast.warning(lang === 'id' ? 'Jumlah catatan pembayaran harus lebih dari 0' : '缴费记录金额必须大于0'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); } return; }
                 }
 
                 var order = await SUPABASE.getOrder(orderId);
@@ -1416,14 +1416,14 @@
                 try { await SUPABASE.updateOverdueDays(); } catch(e) { console.warn('[adminSaveOrder] updateOverdueDays 失败:', e.message); }
                 await SUPABASE.relockOrder(orderId);
 
-                Utils.toast.success(lang === 'id' ? '✅ 订单已修改并重新锁定！' : '✅ 订单已修改并重新锁定！');
+                Utils.toast.success(lang === 'id' ? '✅ Pesanan berhasil diubah dan dikunci kembali!' : '✅ 订单已修改并重新锁定！');
                 if (window.JF && JF.Cache) JF.Cache.clear();
                 await JF.OrdersPage.viewOrder(orderId);
             } catch (error) {
                 console.error('adminSaveOrder error:', error);
-                Utils.toast.error(error.message || (lang === 'id' ? '保存失败' : '保存失败'));
+                Utils.toast.error(error.message || (lang === 'id' ? 'Gagal menyimpan' : '保存失败'));
                 try { await SUPABASE.relockOrder(orderId); } catch(e) {}
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? '保存并重新锁定' : '保存并重新锁定'); }
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); }
             }
         },
 
