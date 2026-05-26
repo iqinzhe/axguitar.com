@@ -107,7 +107,7 @@
     flex: 1; min-height: 0;
     padding: clamp(2px, 0.5vh, 5px) 8px;
     display: flex; flex-direction: column;
-    gap: clamp(0px, 0.2vh, 1px);
+    gap: clamp(0.5px, 1vh, 1.5px);
     overflow: hidden;
   }
   .nav-section-label {
