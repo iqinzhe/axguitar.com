@@ -74,7 +74,7 @@
 
   /* 用户信息区：小屏缩减 */
   .sidebar-user {
-    padding: clamp(6px, 1vh, 12px) 16px;
+    padding: clamp(3px, 1vh, 12px) 16px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     display: flex; align-items: center; gap: 10px; flex-shrink: 0;
   }
@@ -86,7 +86,7 @@
     font-weight: 700; color: var(--white); flex-shrink: 0;
     box-shadow: 0 2px 6px rgba(14, 116, 144, 0.2);
   }
-  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .user-name-top {
     font-size: clamp(0.7rem, 1vh, 0.8rem);
     font-weight: 700; color: #0c1929;
