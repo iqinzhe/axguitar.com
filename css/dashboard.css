@@ -599,6 +599,7 @@
     justify-content: space-between;
     margin-bottom: 6px;
   }
+
   /* mobile-only：桌面隐藏，手机显示 */
   .mobile-only { display: none !important; }
   @media (max-width: 768px) {
@@ -616,6 +617,14 @@
       min-height: 100dvh;
       min-height: calc(100dvh - 56px);
     }
+
+   /* 三星/安卓浏览器触摸滚动优化 */
+   .dash-main {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+}
+     
     .dash-topbar {
       position: sticky; top: 0; z-index: var(--z-topbar);
       background: var(--white); padding: 0 12px; height: 56px;
