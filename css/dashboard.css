@@ -124,7 +124,6 @@
     color: var(--gray-700);
     font-size: clamp(0.7rem, 0.8vh, 0.9rem);
     font-weight: 500; text-decoration: none;
-    border: 3px solid transparent;
     flex-shrink: 0;
   }
   .nav-item:hover { background: rgba(14, 116, 144, 0.12); color: var(--primary); }
