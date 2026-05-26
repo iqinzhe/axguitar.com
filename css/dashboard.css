@@ -76,7 +76,7 @@
 
   /* 用户信息区：小屏缩减 */
   .sidebar-user {
-    padding: clamp(6px, 1vh, 12px) 16px;
+    padding: clamp(3px, 1vh, 12px) 16px;
     border-bottom: 1px solid rgba(14, 116, 144, 0.2);
     display: flex; align-items: center; gap: 10px; flex-shrink: 0;
   }
@@ -136,7 +136,7 @@
   .nav-icon { font-size: clamp(12px, 1.7vh, 15px); width: 18px; text-align: center; flex-shrink: 0; }
   .nav-badge {
     margin-left: auto; background: var(--red-600); color: var(--white);
-    font-size: 0.58rem; padding: 1px 6px; border-radius: 8px;
+    font-size: 0.58rem; padding: 1px 6px; border-radius: 6px;
     font-weight: 700; line-height: 1.4;
   }
 
