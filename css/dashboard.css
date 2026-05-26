@@ -105,7 +105,7 @@
   /* 导航菜单区：flex:1 + 允许收缩，随剩余空间分配 */
   .sidebar-nav {
     flex: 1; min-height: 0;
-    padding: clamp(2px, 0.5vh, 5px) 8px;
+    padding: clamp(2px, 0.5vh, 3px) 5px;
     display: flex; flex-direction: column;
     gap: clamp(0.5px, 1vh, 1.5px);
     overflow: hidden;
