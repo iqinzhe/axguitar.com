@@ -10,7 +10,7 @@
 
 @layer pages {
   :root {
-    --sidebar-width: 205px;
+    --sidebar-width: 210px;
     --topbar-height: 50px;
     --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
@@ -24,13 +24,13 @@
 
   /* 仪表盘外壳：严格 100vh，不允许超出 */
   .dashboard-v2 {
-    margin: -16px;
+    margin: -12px;
     width: calc(100% + 32px);
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: 1fr;           /* 桌面端隐藏 topbar，只有一行 */
     grid-template-areas: "sidebar main";
-    height: 100vh;
+    height: 95vh;
     overflow: hidden;
     background: #f5f6fa;
     font-family: var(--font-sans);
