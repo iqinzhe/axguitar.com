@@ -182,16 +182,16 @@
 
   /* 顶部栏：手机端显示，桌面端隐藏（侧边栏已有相同信息） */
   .dash-topbar {
-  display: none;
-  padding: 10px 20px;
-  height: var(--topbar-height);
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  position: sticky;
-  top: 0;
-  z-index: var(--z-topbar);
-}
+    display: none; /* 默认隐藏；手机端媒体查询内覆盖为 flex */
+    padding: 10px 20px;
+    height: var(--topbar-height);
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: var(--z-topbar);
+  }
 
   .topbar-left { display: flex; align-items: center; gap: 12px; }
   .topbar-title { font-size: 0.95rem; font-weight: 700; color: #0c1929; }
