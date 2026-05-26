@@ -29,24 +29,24 @@
         _getAdminFeeStatus: function(order, lang) {
             var fee = order.admin_fee || 0;
             if (fee === 0) {
-                return '<span class="badge badge--exempt">' + (lang === 'id' ? '免费' : '免费') + '</span>';
+                return '<span class="badge badge--exempt">' + (lang === 'id' ? 'Gratis' : '免费') + '</span>';
             }
             if (order.admin_fee_paid) {
-                return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? '已缴' : '已缴') + '</span>';
+                return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? 'Lunas' : '已缴') + '</span>';
             }
-            return '<span class="badge badge--unpaid">❌ ' + (lang === 'id' ? '未缴' : '未缴') + '</span>';
+            return '<span class="badge badge--unpaid">❌ ' + (lang === 'id' ? 'Belum' : '未缴') + '</span>';
         },
 
         _getServiceFeeStatus: function(order, lang) {
             var fee = order.service_fee_amount || 0;
             if (fee === 0) {
-                return '<span class="badge badge--exempt">' + (lang === 'id' ? '免费' : '免费') + '</span>';
+                return '<span class="badge badge--exempt">' + (lang === 'id' ? 'Gratis' : '免费') + '</span>';
             }
             var paid = order.service_fee_paid || 0;
             if (paid >= fee) {
-                return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? '已缴' : '已缴') + '</span>';
+                return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? 'Lunas' : '已缴') + '</span>';
             }
-            return '<span class="badge badge--unpaid">❌ ' + (lang === 'id' ? '未缴' : '未缴') + '</span>';
+            return '<span class="badge badge--unpaid">❌ ' + (lang === 'id' ? 'Belum' : '未缴') + '</span>';
         },
 
         // ==================== 构建订单列表 HTML ====================
@@ -747,7 +747,7 @@
                 var methodMap = { cash: t('cash'), bank: t('bank') };
                 var rows = '';
                 if (allPayments.length === 0) {
-                    rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td></td>';
+                    rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td></tr>';
                 } else {
                     for (var idx = 0; idx < allPayments.length; idx++) {
                         var p2 = allPayments[idx];
@@ -881,10 +881,10 @@
             var monthlyRate = order.agreed_interest_rate || 0.10;
             var currentMonthlyInterest = remainingPrincipal * monthlyRate;
             var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
-            var adminFeeStatus = order.admin_fee === 0 ? (lang === 'id' ? '免费' : '免费') : (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴'));
+            var adminFeeStatus = order.admin_fee === 0 ? (lang === 'id' ? 'Gratis' : '免费') : (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴'));
             var serviceFeeAmount = order.service_fee_amount || 0;
             var serviceFeePaid = order.service_fee_paid || 0;
-            var serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? '免费' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? '已缴' : '已缴') : '❌ ' + (lang === 'id' ? '未缴' : '未缴'));
+            var serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? 'Gratis' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴'));
 
             // 建立订单日期（优先使用 custom_order_date，否则用 created_at）
             var orderStartDate = order.custom_order_date
@@ -928,7 +928,7 @@
                         '</tr>';
                 }
             }
-            if (interestRows === '') interestRows = '<td><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
+            if (interestRows === '') interestRows = '<tr><td colspan="5" class="text-center">' + t('no_data') + '</td></tr>';
             if (principalRows === '') principalRows = '<tr><td colspan="3" class="text-center">' + t('no_data') + '</td></tr>';
 
             // 修复：repaymentInfoHtml 在 interestCount 确定后构建，确保「已还次数」与「还款记录」一致
@@ -1275,10 +1275,10 @@
                     '<div class="form-grid">' +
                     '<div class="form-group"><label>' + t('admin_fee') + ' (Rp)</label>' +
                     '<input type="text" id="edit_admin_fee" class="amount-input" value="' + Utils.formatNumberWithCommas(order.admin_fee || 0) + '">' +
-                    '<div class="form-hint">💡 ' + (lang === 'id' ? '填0即为免费' : '填0即为免费') + '</div></div>' +
+                    '<div class="form-hint">💡 ' + (lang === 'id' ? 'Isi 0 = Gratis' : '填0即为免费') + '</div></div>' +
                     '<div class="form-group"><label>' + t('service_fee') + ' (Rp)</label>' +
                     '<input type="text" id="edit_service_fee" class="amount-input" value="' + Utils.formatNumberWithCommas(order.service_fee_amount || 0) + '">' +
-                    '<div class="form-hint">💡 ' + (lang === 'id' ? '填0即为免费' : '填0即为免费') + '</div></div>' +
+                    '<div class="form-hint">💡 ' + (lang === 'id' ? 'Isi 0 = Gratis' : '填0即为免费') + '</div></div>' +
                     '<div class="form-group"><label>' + t('service_fee') + ' %</label>' +
                     '<input type="number" id="edit_service_fee_percent" value="' + (order.service_fee_percent || 0) + '" min="0" max="10" step="0.5"></div>' +
                     '<div class="form-group"><label>' + (lang === 'id' ? '月利率 (%)' : '月利率 (%)') + '</label>' +

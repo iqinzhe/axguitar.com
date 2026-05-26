@@ -77,7 +77,6 @@
                 // 门店练习状态提示
                 let practiceWarningHtml = '';
                 if (!isAdmin && storeId) {
-                    const storesData = await SUPABASE.getAllStores();
                     const myStore = storesData.find(s => s.id === storeId);
                     if (myStore?.is_practice === true) {
                         practiceWarningHtml = `

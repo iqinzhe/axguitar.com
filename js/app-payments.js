@@ -576,7 +576,6 @@
                         }));
                     }
                 }
-                if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('payInterestWithMethod error:', error);
@@ -649,7 +648,6 @@
                 Utils.toast.success(lang === 'id' ? 'Pembayaran pokok berhasil!' : '本金还款成功！');
                     // 还款成功：清除仪表盘缓存，确保逾期/到期状态实时更新
                     if (window.JF?.Cache) JF.Cache.clear();
-                if (window.JF && JF.Cache) JF.Cache.clear();
                 await PaymentPage.showPayment(orderId);
             } catch (error) {
                 console.error('payPrincipalWithMethod error:', error);
@@ -729,7 +727,6 @@
                 await SUPABASE.earlySettleFixedOrder(orderId, method, earlyFixedPayDate);
                 if (window.Audit) await window.Audit.logPayment(orderBefore.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
-                if (window.JF?.Cache) JF.Cache.clear();
                     const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
                 const printConfirmed = await Utils.toast.confirm(printConfirm);
                 if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
@@ -794,7 +791,6 @@
                 await SUPABASE.earlySettleFlexibleOrder(orderId, method, remainingPrincipal, flexSettleDate);
                 if (window.Audit) await window.Audit.logPayment(order.order_id, 'early_settlement', remainingPrincipal, method);
                 if (window.JF && JF.Cache) JF.Cache.clear();
-                if (window.JF?.Cache) JF.Cache.clear();
                     const printConfirm = lang === 'id' ? 'LUNAS!\n\n' + Utils.t('print_receipt_confirm') : '结清成功！\n\n' + Utils.t('print_receipt_confirm');
                 const printConfirmed = await Utils.toast.confirm(printConfirm);
                 if (printConfirmed) { APP.printSettlementReceipt(orderId); return; }
@@ -816,7 +812,6 @@
                     Utils.toast.error(lang === 'id' ? 'Pesanan belum lunas' : '订单未结清');
                     return;
                 }
-                const storeWA = await SUPABASE.getStoreWANumber(order.store_id);
                 const storeName = await SUPABASE.getStoreName(order.store_id);
                 const printWindow = window.open('', '_blank');
                 const printDateTime = new Date().toLocaleString();
