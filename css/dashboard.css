@@ -11,7 +11,7 @@
 
 @layer pages {
   :root {
-    --sidebar-width: 210px;
+    --sidebar-width: 205px;
     --topbar-height: 50px;
     --font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
@@ -61,11 +61,11 @@
     height: clamp(26px, 3.5vh, 32px);
     font-size: clamp(11px, 1.5vh, 14px);
     background: var(--gradient-cta);
-    border-radius: 8px;
+    border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; color: var(--white);
     font-family: var(--font-mono); flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(14, 116, 144, 0.4);
+    box-shadow: 0 3px 6px rgba(14, 116, 144, 0.4);
   }
   .logo-text {
     font-size: clamp(0.78rem, 1.2vh, 0.95rem);
@@ -86,9 +86,9 @@
     background: var(--gradient-cta); border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; color: var(--white); flex-shrink: 0;
-    box-shadow: 0 2px 6px rgba(14, 116, 144, 0.2);
+    box-shadow: 0 2px 3px rgba(14, 116, 144, 0.2);
   }
-  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .user-name-top {
     font-size: clamp(0.7rem, 1vh, 0.8rem);
     font-weight: 700; color: #0c1929;
