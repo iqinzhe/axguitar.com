@@ -7,6 +7,8 @@
 *::after {
     box-sizing: border-box;
 }
+  scrollbar-gutter: stable;  /* Edge 显示滚动条时不会挤压内容 */
+}
 
 @layer pages {
   :root {
@@ -30,7 +32,7 @@
     grid-template-columns: var(--sidebar-width) 1fr;
     grid-template-rows: 1fr;           /* 桌面端隐藏 topbar，只有一行 */
     grid-template-areas: "sidebar main";
-    height: 95vh;
+    height: 100dvh;
     overflow: hidden;
     background: #f5f6fa;
     font-family: var(--font-sans);
@@ -611,7 +613,8 @@
       margin: -8px;
       width: calc(100% + 16px);
       display: block !important;
-      min-height: 100vh;
+      min-height: 100dvh;
+      min-height: calc(100dvh - 56px);
     }
     .dash-topbar {
       position: sticky; top: 0; z-index: var(--z-topbar);
