@@ -181,17 +181,19 @@
   .lang-btn-side.active-lang { background: rgba(14, 116, 144, 0.35); color: var(--primary); border-color: rgba(14, 116, 144, 0.5); }
 
   /* 顶部栏：手机端显示，桌面端隐藏（侧边栏已有相同信息） */
-  .dash-topbar { display: none; }
-    padding: 10px 20px;
-    height: var(--topbar-height);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    position: sticky;
-    top: 0;
-    z-index: var(--z-topbar);
-  }
+  .dash-topbar {
+  display: none;
+  padding: 10px 20px;
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-topbar);
+}
+
   .topbar-left { display: flex; align-items: center; gap: 12px; }
   .topbar-title { font-size: 0.95rem; font-weight: 700; color: #0c1929; }
   .topbar-sub { font-size: 0.72rem; color: var(--gray-500); }
