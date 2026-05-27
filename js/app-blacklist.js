@@ -48,7 +48,7 @@
                     .single();
 
                 if (customerError) {
-                    console.error("获取客户信息失败:", customerError);
+                    debugLog("[WARN]","获取客户信息失败:", customerError?.message);
                     throw new Error(lang === 'id' ? 'Gagal mendapatkan data nasabah' : '获取客户信息失败');
                 }
 
@@ -63,7 +63,7 @@
             try {
                 return await SUPABASE.addToBlacklist(customerId, reason, profile.id);
             } catch (error) {
-                console.error("添加黑名单失败:", error);
+                debugLog("[WARN]","添加黑名单失败:", error?.message);
                 throw error;
             }
         },
