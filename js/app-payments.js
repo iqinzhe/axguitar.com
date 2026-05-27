@@ -821,21 +821,7 @@
                     <!DOCTYPE html>
                     <html>
                     <head><meta charset="UTF-8"><title>${lang === 'id' ? 'Tanda Terima Pelunasan' : '结清凭证'}</title>
-                    <style>
-                        *{margin:0;padding:0;box-sizing:border-box}
-                        body{font-family:'Segoe UI',Arial,sans-serif;font-size:10pt;padding:15mm;color:#1e293b}
-                        .header{text-align:center;margin-bottom:20px;border-bottom:2px solid #1e293b;padding-bottom:10px}
-                        .logo{font-size:16pt;font-weight:bold;color:#2563eb}
-                        .store-info{font-size:9pt;color:#475569;margin:5px 0}
-                        .title{font-size:18pt;margin:15px 0;color:#10b981}
-                        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0}
-                        .info-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0}
-                        .info-label{font-weight:600}
-                        .total-box{margin:20px 0;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;text-align:center}
-                        .total-amount{font-size:18pt;font-weight:bold;color:#10b981}
-                        .footer{text-align:center;font-size:8pt;color:#94a3b8;margin-top:30px;border-top:1px solid #e2e8f0;padding-top:10px}
-                        @media print{body{padding:0} .no-print{display:none}}
-                    </style>
+                    <style>${(window.JF?.PrintPage?.PRINT_CSS) || ""}</style>
                     </head>
                     <body>
                         <div class="header">

@@ -13,6 +13,14 @@
         failedOrders: [],
 
         async startMigration() {
+            // 权限门控：仅管理员可执行数据迁移
+            const profile = await SUPABASE.getCurrentProfile();
+            if (profile?.role !== 'admin') {
+                Utils.toast.warning(Utils.lang === 'id'
+                    ? '⛔ Hanya administrator yang dapat menjalankan migrasi data.'
+                    : '⛔ 仅管理员可执行数据迁移。');
+                return;
+            }
             if (this.isMigrating) return;
             this.isMigrating = true;
             this.failedOrders = [];

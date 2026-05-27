@@ -305,6 +305,10 @@ ${buildFooter(lang)}
         }
     };
 
+    // 导出公共打印工具（供 store.js / funds.js / payments.js 复用）
+    PrintPage.PRINT_CSS    = PRINT_CSS;
+    PrintPage.buildHeader  = buildHeader;
+    PrintPage.buildFooter  = buildFooter;
     JF.PrintPage = PrintPage;
     if (window.APP) {
         window.APP.printCurrentPage = PrintPage.printCurrentPage.bind(PrintPage);

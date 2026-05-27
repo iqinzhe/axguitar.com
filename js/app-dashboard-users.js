@@ -150,6 +150,14 @@
 
         // 原有的 showUserManagement（兼容直接调用）
         async showUserManagement() {
+            // 权限门控：仅管理员可访问用户管理
+            const canAccess = await PERMISSION.canAsync('user_manage');
+            if (!canAccess) {
+                Utils.toast.warning(Utils.lang === 'id'
+                    ? '⛔ Hanya administrator yang dapat mengakses manajemen pengguna.'
+                    : '⛔ 仅管理员可访问用户管理。');
+                return;
+            }
             APP.currentPage = 'userManagement';
             APP.saveCurrentPageState();
             const contentHTML = await this.buildUserManagementHTML();
@@ -416,6 +424,14 @@
         },
 
         async deleteUser(userId) {
+            // 权限校验：仅管理员可删除用户
+            const canDelete = await PERMISSION.canAsync('user_delete');
+            if (!canDelete) {
+                Utils.toast.warning(Utils.lang === 'id'
+                    ? '⛔ Hanya administrator yang dapat menghapus pengguna.'
+                    : '⛔ 仅管理员可删除用户。');
+                return;
+            }
             const msg = Utils.lang === 'id' ? 'Hapus peran ini?' : '删除此角色？';
             const confirmed = await Utils.toast.confirm(msg);
             if (!confirmed) return;

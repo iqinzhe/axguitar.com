@@ -686,61 +686,7 @@
 <head>
     <meta charset="UTF-8">
     <title>JF! by Gadai - ${isZh ? '门店财务汇总' : 'Ringkasan Keuangan Toko'}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #1e293b; background: #fff; }
-        @page { size: A4 portrait; margin: 8mm 10mm; }
-        @media print { html { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        .ph {
-            text-align: center;
-            border-bottom: 2px solid #1e293b;
-            padding-bottom: 5px;
-            margin-bottom: 5px;
-        }
-        .ph-logo { font-size: 13pt; font-weight: bold; color: #0e7490; margin-bottom: 2px; }
-        .ph-info { font-size: 7.5pt; color: #475569; white-space: nowrap; }
-        .pf {
-            border-top: 1px solid #e2e8f0;
-            padding-top: 4px;
-            margin-top: 5px;
-            text-align: center;
-            font-size: 7pt;
-            color: #94a3b8;
-        }
-        .store-finance-card {
-            border: 1.5px solid #334155;
-            border-radius: 5px;
-            margin-bottom: 5mm;
-            break-inside: avoid;
-            page-break-inside: avoid;
-            width: 100%;
-        }
-        .card-header {
-            font-weight: bold;
-            font-size: 12pt;
-            text-align: center;
-            padding: 5px 8px;
-            background: #f1f5f9;
-            border-bottom: 1.5px solid #334155;
-        }
-        .card-header span { font-size: 10pt; color: #64748b; font-weight: normal; }
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-        }
-        .card-grid > div {
-            border-right: 1px solid #cbd5e1;
-            border-bottom: 1px solid #cbd5e1;
-            padding: 6px 8px;
-        }
-        .card-grid > div:nth-child(4n) { border-right: none; }
-        .card-grid > div:nth-child(n+9) { border-bottom: none; }
-        @media print {
-            .card-grid {
-                grid-template-columns: repeat(4, 1fr) !important;
-            }
-        }
-    </style>
+    <style>${(window.JF?.PrintPage?.PRINT_CSS) || ""}</style>
 </head>
 <body>
     <div class="ph">
