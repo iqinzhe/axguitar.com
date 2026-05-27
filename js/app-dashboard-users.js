@@ -14,6 +14,14 @@
             const lang = Utils.lang;
             const t = Utils.t.bind(Utils);
 
+            // 权限门控：直接调用时也需验证（防止路由器绕过）
+            const canAccess = await PERMISSION.canAsync('user_manage');
+            if (!canAccess) {
+                return `<div class="card" style="padding:32px;text-align:center;color:var(--danger);">
+                    ⛔ ${lang === 'id' ? 'Akses ditolak. Hanya administrator yang dapat mengakses halaman ini.' : '访问被拒绝，仅管理员可访问用户管理页面。'}
+                </div>`;
+            }
+
             try {
                 const users = await SUPABASE.getAllUsers();
                 const stores = await SUPABASE.getAllStores();

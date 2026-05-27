@@ -2046,7 +2046,16 @@
                 } catch(e) { /* ignore */ }
             }
             
-            const { data, error } = await supabaseClient.from('user_profiles').select('*, stores(*)').order('name');
+            // 权限过滤：非 admin 只返回本门店成员，防止数据越权
+            const profile = await this.getCurrentProfile();
+            let query = supabaseClient.from('user_profiles').select('*, stores(*)').order('name');
+            if (profile?.role !== 'admin' && profile?.store_id) {
+                query = query.eq('store_id', profile.store_id);
+            } else if (profile?.role !== 'admin' && !profile?.store_id) {
+                // 无门店归属的非 admin，只能看自己
+                query = query.eq('id', profile?.id);
+            }
+            const { data, error } = await query;
             if (error) throw error;
             
             try {

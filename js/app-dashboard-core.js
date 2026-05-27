@@ -441,7 +441,21 @@
                 else if (page === 'expenses') { if (JF.ExpensesPage?.buildExpensesHTML) contentHtml = await JF.ExpensesPage.buildExpensesHTML(); }
                 else if (page === 'paymentHistory') { if (JF.FundsPage?.buildCashFlowPageHTML) contentHtml = await JF.FundsPage.buildCashFlowPageHTML(); }
                 else if (page === 'anomaly') { if (JF.AnomalyPage?.buildAnomalyHTML) contentHtml = await JF.AnomalyPage.buildAnomalyHTML(); }
-                else if (page === 'userManagement') { if (JF.UsersPage?.buildUserManagementHTML) contentHtml = await JF.UsersPage.buildUserManagementHTML(); }
+                else if (page === 'userManagement') {
+                    if (JF.UsersPage?.buildUserManagementHTML) {
+                        // 路由器层权限门控：非 admin 重定向到首页
+                        const canAccess = await PERMISSION.canAsync('user_manage');
+                        if (!canAccess) {
+                            const lang = Utils.lang;
+                            Utils.toast.warning(lang === 'id'
+                                ? '⛔ Hanya administrator yang dapat mengakses manajemen pengguna.'
+                                : '⛔ 仅管理员可访问用户管理。');
+                            this.navigate('dashboard');
+                            return;
+                        }
+                        contentHtml = await JF.UsersPage.buildUserManagementHTML();
+                    }
+                }
                 else if (page === 'storeManagement') { if (JF.StoreManager?.buildStoreManagementHTML) contentHtml = await JF.StoreManager.buildStoreManagementHTML(); }
                 else if (page === 'backupRestore') { if (JF.BackupStorage?.renderBackupUI) { await JF.BackupStorage.renderBackupUI(); this.saveCurrentPageState(); return; } }
                 else if (page === 'storeFinance') {
@@ -454,6 +468,16 @@
                     return;
                 }
                 else if (page === 'dataRepair') {
+                    // 权限门控：数据修复仅 admin 可访问
+                    const canRepair = await PERMISSION.canAsync('backup_restore');
+                    if (!canRepair) {
+                        const lang = Utils.lang;
+                        Utils.toast.warning(lang === 'id'
+                            ? '⛔ Hanya administrator yang dapat mengakses perbaikan data.'
+                            : '⛔ 仅管理员可访问数据修复。');
+                        this.navigate('dashboard');
+                        return;
+                    }
                     const lang = Utils.lang;
                     contentHtml = `<div class="page-header"><h2>🔧 ${lang === 'id' ? 'Perbaikan Data' : '数据修复'}</h2><div class="header-actions"><button onclick="APP.goBack()" class="btn btn--outline">↩️ ${lang === 'id' ? 'Kembali' : '返回'}</button></div></div>
                     <div class="card" style="max-width:680px;margin:0 auto;">
@@ -1205,6 +1229,14 @@
     // 全面修复函数（替代原来的 runBatchRepair）
     window.APP.runFullSystemRepair = async function() {
         const lang = Utils.lang;
+        // 权限验证：仅 admin 可执行全量修复
+        const canRun = await PERMISSION.canAsync('backup_restore');
+        if (!canRun) {
+            Utils.toast.warning(lang === 'id'
+                ? '⛔ Hanya administrator yang dapat menjalankan perbaikan data.'
+                : '⛔ 仅管理员可执行数据修复。');
+            return;
+        }
         const btn = document.getElementById('dataRepairBtn');
         const progressBox = document.getElementById('dataRepairProgress');
         const progressBar = document.getElementById('dataRepairProgressBar');
