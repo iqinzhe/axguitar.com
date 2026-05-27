@@ -1,4 +1,4 @@
-/* loading-init.js — 加载动画与 token 状态检查（从 index.html 内联块提取） */
+/* loading-init.js — 加载动画与 token 状态检查 */
 (function(){
 'use strict';
 
