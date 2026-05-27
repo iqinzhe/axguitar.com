@@ -282,7 +282,7 @@
                             if (addBtn) { addBtn.disabled = false; addBtn.textContent = '💾 ' + t('save_customer'); }
                             return;
                         }
-                    } catch (blErr) { console.warn('黑名单重复检查失败:', blErr.message); }
+                    } catch (blErr) { debugLog('[WARN]','黑名单重复检查失败:', blErr.message); }
                 }
 
                 let newCustomer = null;
@@ -331,7 +331,7 @@
                 try {
                     const blResult = await SUPABASE.checkBlacklist(customer.id);
                     if (blResult.isBlacklisted) { isBlacklisted = true; blacklistReason = blResult.reason; }
-                } catch (blErr) { console.warn('黑名单检查失败:', blErr.message); }
+                } catch (blErr) { debugLog('[WARN]','黑名单检查失败:', blErr.message); }
 
                 const { activeCount, completedCount, abnormalCount } = await SUPABASE.getCustomerOrdersStats(customerId);
 
@@ -587,7 +587,7 @@
                         .from('payment_history')
                         .delete()
                         .in('order_id', orderIds);
-                    if (payError) console.warn('删除缴费记录失败:', payError.message);
+                    if (payError) debugLog('[WARN]','删除缴费记录失败:', payError.message);
                 }
                 
                 if (orderIds.length > 0) {
@@ -595,13 +595,13 @@
                         .from('cash_flow_records')
                         .delete()
                         .in('order_id', orderIds);
-                    if (flowError) console.warn('删除现金流记录失败:', flowError.message);
+                    if (flowError) debugLog('[WARN]','删除现金流记录失败:', flowError.message);
                     
                     const { error: refError } = await client
                         .from('cash_flow_records')
                         .delete()
                         .eq('customer_id', customerId);
-                    if (refError) console.warn('删除关联现金流失败:', refError.message);
+                    if (refError) debugLog('[WARN]','删除关联现金流失败:', refError.message);
                 }
                 
                 if (orderIds.length > 0) {
@@ -609,7 +609,7 @@
                         .from('reminder_logs')
                         .delete()
                         .in('order_id', orderIds);
-                    if (remindError) console.warn('删除提醒记录失败:', remindError.message);
+                    if (remindError) debugLog('[WARN]','删除提醒记录失败:', remindError.message);
                 }
                 
                 const { error: orderDeleteError } = await client
@@ -622,7 +622,7 @@
                     .from('blacklist')
                     .delete()
                     .eq('customer_id', customerId);
-                if (blacklistError) console.warn('删除黑名单记录失败:', blacklistError.message);
+                if (blacklistError) debugLog('[WARN]','删除黑名单记录失败:', blacklistError.message);
                 
                 const { error: customerError } = await client
                     .from('customers')

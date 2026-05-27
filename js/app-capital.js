@@ -75,7 +75,7 @@
                         </div>
                     </div>`;
             } catch (e) {
-                console.warn('获取门店资本状况失败:', e);
+                debugLog('[WARN]','获取门店资本状况失败:', e);
             }
             
             const modalHtml = `

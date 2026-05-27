@@ -335,7 +335,7 @@
                             isDuplicate = true;
                         }
                     } catch (dupCheckError) {
-                        console.warn('[Restore] 去重检查失败，继续插入:', dupCheckError.message);
+                        debugLog('[WARN]','[Restore] 去重检查失败，继续插入:', dupCheckError.message);
                         isDuplicate = false;
                     }
                     

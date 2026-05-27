@@ -335,7 +335,7 @@
         _clearOverdueInterval() { if (_overdueInterval) { clearInterval(_overdueInterval); _overdueInterval = null; } },
 
         _idleTimer: null,
-        _IDLE_TIMEOUT: 18 * 60 * 1000,
+        _IDLE_TIMEOUT: 18 * (window.JF_TIME?.MS_MINUTE || 60000),
         _initIdleTimer() {
             if (this._idleListenerAttached) return;
             this._idleListenerAttached = true;
@@ -349,7 +349,7 @@
             if (this._idleTimer) clearTimeout(this._idleTimer);
             if (!AUTH.isLoggedIn()) return;
             this._idleTimer = setTimeout(async () => {
-                console.warn('[IdleTimer] 闲置超时，自动登出');
+                debugLog('[WARN]','[IdleTimer] 闲置超时，自动登出');
                 Utils.toast.warning(Utils.lang === 'id' ? '⏰ Sesi berakhir karena tidak ada aktivitas selama 18 menit.' : '⏰ 已闲置18分钟，系统自动登出。', 4000);
                 await new Promise(r => setTimeout(r, 3000));
                 await this._idleLogout();
@@ -366,7 +366,7 @@
                         username: AUTH.user?.name || 'unknown',
                         timestamp: new Date().toISOString()
                     }));
-                } catch (e) { console.warn('审计日志记录失败:', e); }
+                } catch (e) { debugLog('[WARN]','审计日志记录失败:', e); }
             }
             this.clearPageState();
             sessionStorage.clear();
@@ -383,8 +383,8 @@
             this._clearOverdueInterval();
             if (!AUTH.isLoggedIn()) return;
             _overdueInterval = setInterval(async () => {
-                try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { console.warn('[逾期更新] 失败:', err.message); }
-            }, 18 * 60 * 1000);
+                try { await SUPABASE.updateOverdueDays(); if (this.currentPage === 'dashboard' || this.currentPage === 'anomaly') await this.refreshCurrentPage(); } catch (err) { debugLog('[WARN]','[逾期更新] 失败:', err.message); }
+            }, 18 * (window.JF_TIME?.MS_MINUTE || 60000));
         },
 
         async _ensureShell() {
@@ -804,7 +804,7 @@
                             const due = new Date(d); due.setHours(0,0,0,0);
                             const now = new Date(); now.setHours(0,0,0,0);
                             const diff = due - now;
-                            return diff >= 0 && diff <= 7 * 86400000;
+                            return diff >= 0 && diff <= 7 * (window.JF_TIME?.MS_DAY || 86400000);
                         }) : (Array.isArray(dueOrdersRes) ? dueOrdersRes : []),
                         calendar_due: (dueOrdersRes && dueOrdersRes.dueOrders) ? dueOrdersRes.dueOrders : [],
                         calendar_pawn_due: (dueOrdersRes && dueOrdersRes.pawnDueOrders) ? dueOrdersRes.pawnDueOrders : [],
@@ -1099,7 +1099,7 @@
                 detailsPromise.then(details => {
                     this._updateDashboardDetails(details, lang, isAdmin, kpiReport);
                 }).catch(err => {
-                    console.warn('[Dashboard] 详细信息加载失败:', err);
+                    debugLog('[WARN]','[Dashboard] 详细信息加载失败:', err);
                 });
 
             } catch (err) {
@@ -1183,7 +1183,7 @@
         invalidateDashboardCache() { JF.Cache.clear(); this.refreshCurrentPage(); Utils.toast.info(Utils.lang === 'id' ? 'Cache dihapus, data diperbarui' : '缓存已清除，数据已刷新', 2000); },
 
         async init() {
-            if (this._isInitialized) { console.warn('[DashboardCore] 已初始化，忽略重复调用'); return; }
+            if (this._isInitialized) { debugLog('[WARN]','[DashboardCore] 已初始化，忽略重复调用'); return; }
             ModuleFallback.clearAll();
             try {
                 await AUTH.init();

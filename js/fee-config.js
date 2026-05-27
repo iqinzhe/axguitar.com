@@ -87,11 +87,11 @@
             } else if (percent < cfg.MIN_PERCENT) {
                 // 低于最小值时，使用最小值（截断）
                 validPercent = cfg.MIN_PERCENT;
-                console.warn(`[FeeConfig] 服务费百分比 ${percent}% 低于最小值 ${cfg.MIN_PERCENT}%，已截断为 ${cfg.MIN_PERCENT}%`);
+                debugLog('[WARN]',`[FeeConfig] 服务费百分比 ${percent}% 低于最小值 ${cfg.MIN_PERCENT}%，已截断为 ${cfg.MIN_PERCENT}%`);
             } else if (percent > cfg.MAX_PERCENT) {
                 // 超过最大值时，截断到最大值（而非重置为默认值）
                 validPercent = cfg.MAX_PERCENT;
-                console.warn(`[FeeConfig] 服务费百分比 ${percent}% 超过最大值 ${cfg.MAX_PERCENT}%，已截断为 ${cfg.MAX_PERCENT}%`);
+                debugLog('[WARN]',`[FeeConfig] 服务费百分比 ${percent}% 超过最大值 ${cfg.MAX_PERCENT}%，已截断为 ${cfg.MAX_PERCENT}%`);
             } else {
                 validPercent = percent;
             }

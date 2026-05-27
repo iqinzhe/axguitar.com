@@ -352,17 +352,17 @@
                                     <div class="action-input-group">
                                         <label class="action-label">🔢 ${lang === 'id' ? 'Jumlah Bulan Dibayar' : '缴纳期数'}:</label>
                                         <select id="interestMonthsSelect" class="amount-input" onchange="(function(){
-                                            var m=parseInt(document.getElementById('interestMonthsSelect').value)||1;
-                                            var base=${Math.round(currentMonthlyInterest)};
+                                            let m=parseInt(document.getElementById('interestMonthsSelect').value)||1;
+                                            let base=${Math.round(currentMonthlyInterest)};
                                             document.getElementById('interestAmount').value=Utils.formatNumberWithCommas(base*m);
-                                            var today='${interestDateToday}';
-                                            var d=new Date(today);
+                                            let today='${interestDateToday}';
+                                            let d=new Date(today);
                                             d.setMonth(d.getMonth()+(m-1));
-                                            var maxD=d.toISOString().substring(0,10);
-                                            var dateEl=document.getElementById('interestPaymentDate');
+                                            let maxD=d.toISOString().substring(0,10);
+                                            let dateEl=document.getElementById('interestPaymentDate');
                                             dateEl.max=maxD;
                                             if(dateEl.value>maxD) dateEl.value=maxD;
-                                            var hint=document.getElementById('interestDateHint');
+                                            let hint=document.getElementById('interestDateHint');
                                             if(hint) hint.textContent=m>1?'💡 ${lang === 'id' ? 'Prabayar' : '预付'} '+m+' ${lang === 'id' ? '期，入账日期可为未来' : '期，入账日期可选未来'}':'💡 ${lang === 'id' ? `Boleh pilih tanggal sebelumnya untuk mencatat ulang (min: ${interestDateMin})` : `可选择以前日期补录（最早：${interestDateMin}）`}';
                                         })()">
                                             <option value="1">1 ${lang === 'id' ? 'bulan (normal)' : '期（本期）'}</option>

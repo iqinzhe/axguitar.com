@@ -45,14 +45,14 @@
                 }
             }
             const { data, error } = await query;
-            if (error) { console.warn('获取逾期订单失败:', error); return []; }
+            if (error) { debugLog('[WARN]','获取逾期订单失败:', error); return []; }
 
             // 前端补充实时 overdue_days 字段供显示用
             const todayStr = todayDate.toISOString().split('T')[0];
             return (data || []).map(o => {
                 const dueDateStr = o.next_interest_due_date;
                 const dueTime = new Date(dueDateStr).getTime();
-                const overdueDays = Math.floor((todayDate.getTime() - dueTime) / 86400000);
+                const overdueDays = Math.floor((todayDate.getTime() - dueTime) / (window.JF_TIME?.MS_DAY || 86400000));
                 return { ...o, overdue_days: overdueDays };
             });
         },
@@ -64,7 +64,7 @@
                 .select('*, customers!blacklist_customer_id_fkey(name, phone, customer_id)', { count: 'exact' })
                 .order('blacklisted_at', { ascending: false })
                 .range(page * pageSize, (page + 1) * pageSize - 1);
-            if (error) { console.warn('获取黑名单失败:', error); return { data: [], totalCount: 0 }; }
+            if (error) { debugLog('[WARN]','获取黑名单失败:', error); return { data: [], totalCount: 0 }; }
             return { data: data || [], totalCount: count || 0 };
         },
 
@@ -81,7 +81,7 @@
                 .select('id, store_id, loan_amount, status, created_at, custom_order_date, next_interest_due_date')
                 .gte('created_at', monthStart)
                 .lte('created_at', monthEnd);
-            if (error) { console.warn('获取本月订单失败:', error); return { top3: [], bottom3: [] }; }
+            if (error) { debugLog('[WARN]','获取本月订单失败:', error); return { top3: [], bottom3: [] }; }
 
             // 实时计算逾期门店
             const todayForRanking = new Date();
@@ -124,7 +124,7 @@
                     order.next_interest_due_date &&
                     order.next_interest_due_date < todayRankStr;
                 const dueTime = order.next_interest_due_date ? new Date(order.next_interest_due_date).getTime() : null;
-                const realOverdueDays = dueTime ? Math.floor((todayForRanking.getTime() - dueTime) / 86400000) : 0;
+                const realOverdueDays = dueTime ? Math.floor((todayForRanking.getTime() - dueTime) / (window.JF_TIME?.MS_DAY || 86400000)) : 0;
                 if (isRealOverdue && realOverdueDays >= 15) storeStats[order.store_id].badOrders++;
                 storeStats[order.store_id].totalRecovery += (flowAmountByOrder[order.id] || 0);
             }

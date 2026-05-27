@@ -125,7 +125,7 @@
                     recorded_by: adminUserId
                 }));
                 const { error: paymentError } = await client.from('payment_history').insert(paymentRows);
-                if (paymentError) console.warn('付款记录迁移失败:', oldOrder.order_id, paymentError);
+                if (paymentError) debugLog('[WARN]','付款记录迁移失败:', oldOrder.order_id, paymentError);
             }
 
             return newOrder;

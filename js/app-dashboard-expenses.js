@@ -488,7 +488,7 @@
                     .eq('is_voided', false);
 
                 if (flowError) {
-                    console.warn('查询关联现金流失败:', flowError.message);
+                    debugLog('[WARN]','查询关联现金流失败:', flowError.message);
                 }
 
                 let flowSum = 0;
@@ -500,7 +500,7 @@
                 const epsilon = 1;
 
                 if (Math.abs(flowSum - oldAmount) > epsilon) {
-                    console.warn('⚠️ 现金流记录与支出记录不一致，将自动修复。旧金额:', oldAmount, '现金流总和:', flowSum);
+                    debugLog('[WARN]','⚠️ 现金流记录与支出记录不一致，将自动修复。旧金额:', oldAmount, '现金流总和:', flowSum);
                     if (relatedFlows && relatedFlows.length > 0) {
                         for (const flow of relatedFlows) {
                             await client.from('cash_flow_records')

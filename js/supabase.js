@@ -104,7 +104,7 @@
         });
     } catch(e) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.warn('⚠️ Supabase 初始化降级');
+        debugLog('[WARN]','⚠️ Supabase 初始化降级');
     }
 
     // ==================== 通用工具 ====================
@@ -122,12 +122,12 @@
         try {
             return await fn();
         } catch(error) {
-            if(!silent) console.warn('[Supabase]', error.message || error);
+            if(!silent) debugLog('[WARN]','[Supabase]', error.message || error);
             if(error.status===401 || (error.message && (error.message.includes('JWT')||error.message.includes('session')))){
                 if (JF.DashboardCore && typeof JF.DashboardCore.logout === 'function') {
                     setTimeout(() => JF.DashboardCore.logout(), 1000);
                 } else {
-                    console.warn('[Supabase] DashboardCore.logout 不可用，无法自动登出');
+                    debugLog('[WARN]','[Supabase] DashboardCore.logout 不可用，无法自动登出');
                 }
             }
             return fallback;
@@ -230,15 +230,15 @@
 
         async isAdmin() {
             try { const p = await this.getCurrentProfile(); return p?.role === 'admin'; }
-            catch (e) { console.warn('[SUPABASE] isAdmin 失败:', e.message); return false; }
+            catch (e) { debugLog('[WARN]','[SUPABASE] isAdmin 失败:', e.message); return false; }
         },
         async getCurrentStoreId() {
             try { const p = await this.getCurrentProfile(); return p?.store_id; }
-            catch (e) { console.warn('[SUPABASE] getCurrentStoreId 失败:', e.message); return null; }
+            catch (e) { debugLog('[WARN]','[SUPABASE] getCurrentStoreId 失败:', e.message); return null; }
         },
         async getCurrentStoreName() {
             try { const p = await this.getCurrentProfile(); return p?.stores?.name || 'Kantor'; }
-            catch (e) { console.warn('[SUPABASE] getCurrentStoreName 失败:', e.message); return 'Kantor'; }
+            catch (e) { debugLog('[WARN]','[SUPABASE] getCurrentStoreName 失败:', e.message); return 'Kantor'; }
         },
 
         // ---------- login ----------
@@ -327,7 +327,7 @@
                 if (error) throw error;
                 return { is_active: data?.is_active !== false, name: data?.name || '' };
             } catch (error) {
-                console.warn('[Supabase] checkStoreStatus failed:', error.message);
+                debugLog('[WARN]','[Supabase] checkStoreStatus failed:', error.message);
                 return { is_active: true, name: '' };
             }
         },
@@ -788,7 +788,7 @@
                         flow_date: expenseData.expense_date || todayStr()
                     });
                 } catch (flowError) {
-                    console.warn('[addExpense] 现金流记录失败:', flowError.message);
+                    debugLog('[WARN]','[addExpense] 现金流记录失败:', flowError.message);
                 }
                 
                 return data;
@@ -1180,7 +1180,7 @@
             if(paymentMethod===undefined) paymentMethod='cash';
             const order = await this.getOrder(orderId);
             if (order.admin_fee_paid) {
-                console.warn(`[recordAdminFee] 订单 ${orderId} 管理费已记录，跳过重复写入`);
+                debugLog('[WARN]',`[recordAdminFee] 订单 ${orderId} 管理费已记录，跳过重复写入`);
                 return true;
             }
             const profile = await this.getCurrentProfile();
@@ -1380,7 +1380,7 @@
             if (months <= 1) {
                 // 非预付：拒绝未来日期
                 if (recordDate > today) {
-                    console.warn(`[recordInterestPayment] 非预付日期 ${recordDate} 超过今日 ${today}，已自动修正为今日`);
+                    debugLog('[WARN]',`[recordInterestPayment] 非预付日期 ${recordDate} 超过今日 ${today}，已自动修正为今日`);
                     recordDate = today;
                 }
             } else {
@@ -1389,7 +1389,7 @@
                 maxDateObj.setMonth(maxDateObj.getMonth() + months);
                 const maxDate = maxDateObj.toISOString().substring(0, 10);
                 if (recordDate > maxDate) {
-                    console.warn(`[recordInterestPayment] 预付日期 ${recordDate} 超出允许范围 ${maxDate}，已自动修正`);
+                    debugLog('[WARN]',`[recordInterestPayment] 预付日期 ${recordDate} 超出允许范围 ${maxDate}，已自动修正`);
                     recordDate = maxDate;
                 }
             }
@@ -1507,7 +1507,7 @@
                         flow_date: recordDate
                     });
                 }
-                if(shortfallToTrack>0) console.warn(`订单 ${orderId} 利息少付 ${Utils.formatCurrency(shortfallToTrack)}`);
+                if(shortfallToTrack>0) debugLog('[WARN]',`订单 ${orderId} 利息少付 ${Utils.formatCurrency(shortfallToTrack)}`);
                 if(window.Audit) await window.Audit.logPayment(currentOrder.order_id, 'interest', interestToRecord, paymentMethod);
                 return { paidAmount, interestToRecord, shortfall: shortfallToTrack };
             } catch (error) {
@@ -1796,7 +1796,7 @@
                 
                 let overdue = 0;
                 if(todayTime > dueTime) {
-                    overdue = Math.floor((todayTime - dueTime) / 86400000);
+                    overdue = Math.floor((todayTime - dueTime) / (window.JF_TIME?.MS_DAY || 86400000));
                 }
 
                 // 本金到期补充判断：灵活还款有 pawn_due_date 时，
@@ -1806,7 +1806,7 @@
                     const [py, pm, pd] = o.pawn_due_date.split('-').map(Number);
                     const pawnTime = new Date(Date.UTC(py, pm - 1, pd, 0, 0, 0)).getTime();
                     if(todayTime > pawnTime) {
-                        const principalOverdue = Math.floor((todayTime - pawnTime) / 86400000);
+                        const principalOverdue = Math.floor((todayTime - pawnTime) / (window.JF_TIME?.MS_DAY || 86400000));
                         // 取利息逾期天数和本金逾期天数中较大者，确保催收力度足够
                         overdue = Math.max(overdue, principalOverdue);
                     }
@@ -1889,7 +1889,7 @@
                         new_amount: updateData.loan_amount
                     }));
                 } catch(flowErr) {
-                    console.warn('[updateOrder] 同步贷款发放流水金额失败:', flowErr.message);
+                    debugLog('[WARN]','[updateOrder] 同步贷款发放流水金额失败:', flowErr.message);
                 }
             }
             if(customerId && (updateData.customer_name || updateData.customer_phone || updateData.customer_ktp)){
@@ -2220,7 +2220,7 @@
             const candidates = (orders || []).filter(order => {
                 if (!order.next_interest_due_date) return false;
                 const due = new Date(order.next_interest_due_date); due.setHours(0, 0, 0, 0);
-                return Math.ceil((due - today) / 86400000) === reminderDays;
+                return Math.ceil((due - today) / (window.JF_TIME?.MS_DAY || 86400000)) === reminderDays;
             });
             if (!candidates.length) return [];
 
@@ -2439,13 +2439,13 @@
         const todayTime = todayJakarta.getTime();
         const [dyear, dmonth, dday] = newNextDueDate.split('-').map(Number);
         const interestDueTime = new Date(Date.UTC(dyear, dmonth - 1, dday, 0, 0, 0)).getTime();
-        let newOverdueDays = todayTime > interestDueTime ? Math.floor((todayTime - interestDueTime) / 86400000) : 0;
+        let newOverdueDays = todayTime > interestDueTime ? Math.floor((todayTime - interestDueTime) / (window.JF_TIME?.MS_DAY || 86400000)) : 0;
         // 同时检查本金到期：若本金已过期，取两者较大值
         if (newPawnDueDate && orderRow.repayment_type === 'flexible') {
             const [py, pm, pd] = newPawnDueDate.split('-').map(Number);
             const pawnDueTime = new Date(Date.UTC(py, pm - 1, pd, 0, 0, 0)).getTime();
             if (todayTime > pawnDueTime) {
-                const principalOverdue = Math.floor((todayTime - pawnDueTime) / 86400000);
+                const principalOverdue = Math.floor((todayTime - pawnDueTime) / (window.JF_TIME?.MS_DAY || 86400000));
                 newOverdueDays = Math.max(newOverdueDays, principalOverdue);
             }
         }
@@ -2487,7 +2487,7 @@
                 .eq('flow_type', 'loan_disbursement')
                 .eq('is_voided', false);
         } catch (disbErr) {
-            console.warn('[adminSyncPaymentRecords] 同步 loan_disbursement 流水失败:', disbErr.message);
+            debugLog('[WARN]','[adminSyncPaymentRecords] 同步 loan_disbursement 流水失败:', disbErr.message);
         }
 
         await supabaseClient

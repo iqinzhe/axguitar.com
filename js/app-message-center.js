@@ -277,7 +277,7 @@
                         } 
                         // 最终降级：浏览器后退 + 手动渲染仪表盘
                         else {
-                            console.warn('[MessageCenter] goBack 不可用，使用降级方案');
+                            debugLog('[WARN]','[MessageCenter] goBack 不可用，使用降级方案');
                             if (typeof JF !== 'undefined' && JF.DashboardCore && typeof JF.DashboardCore.renderDashboard === 'function') {
                                 JF.DashboardCore.renderDashboard();
                             } else {

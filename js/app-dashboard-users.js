@@ -382,13 +382,13 @@
                             // 调用 Admin API 撤销用户会话
                             const { error: signOutError } = await client.auth.admin.signOut(userId);
                             if (signOutError) {
-                                console.warn('[resetUserPassword] 撤销用户 session 失败:', signOutError.message);
+                                debugLog('[WARN]','[resetUserPassword] 撤销用户 session 失败:', signOutError.message);
                                 // 非致命错误，不阻断流程
                             } else {
                                 console.info('[resetUserPassword] 已撤销用户 session:', userId);
                             }
                         } catch (logoutError) {
-                            console.warn('[resetUserPassword] 撤销 session 异常:', logoutError.message);
+                            debugLog('[WARN]','[resetUserPassword] 撤销 session 异常:', logoutError.message);
                         }
                         
                         closeModal();

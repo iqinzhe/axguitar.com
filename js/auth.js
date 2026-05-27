@@ -96,7 +96,7 @@
             try {
                 await SUPABASE.getClient().auth.signOut();
             } catch (e) {
-                console.warn('[Auth] Supabase signOut 失败:', e.message);
+                debugLog('[WARN]','[Auth] Supabase signOut 失败:', e.message);
             }
 
             try {
@@ -120,7 +120,7 @@
                 }
                 ssKeysToRemove.forEach(key => sessionStorage.removeItem(key));
             } catch (e) {
-                console.warn('[Auth] 清除存储失败:', e.message);
+                debugLog('[WARN]','[Auth] 清除存储失败:', e.message);
             }
         },
 
@@ -140,7 +140,7 @@
                     await this.loadCurrentUser();
                 }
             } catch (e) {
-                console.warn('[Auth] 加载用户失败，清除认证状态:', e.message);
+                debugLog('[WARN]','[Auth] 加载用户失败，清除认证状态:', e.message);
                 await this.forceClearAuth();
             }
 
@@ -163,14 +163,14 @@
                         try {
                             await this.loadCurrentUser();
                         } catch (e) {
-                            console.warn('[Auth] Token 刷新后加载用户失败:', e.message);
+                            debugLog('[WARN]','[Auth] Token 刷新后加载用户失败:', e.message);
                             await this.forceClearAuth();
                             if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
                                 await JF.DashboardCore.renderLogin();
                             }
                         }
                     } else {
-                        console.warn('[Auth] Token 刷新失败，清除认证状态');
+                        debugLog('[WARN]','[Auth] Token 刷新失败，清除认证状态');
                         await this.forceClearAuth();
                         if (JF.DashboardCore && JF.DashboardCore.currentPage !== 'login') {
                             await JF.DashboardCore.renderLogin();
@@ -232,12 +232,12 @@
         // [优化-2] 异步角色查询统一由 PERMISSION 模块管理，此处仅保留业务需要的两个
         async getFreshRole() {
             try { return (await SUPABASE.getCurrentProfile())?.role || null; }
-            catch (e) { console.warn('[AUTH] getFreshRole 失败:', e.message); return null; }
+            catch (e) { debugLog('[WARN]','[AUTH] getFreshRole 失败:', e.message); return null; }
         },
 
         async getFreshStoreId() {
             try { return (await SUPABASE.getCurrentProfile())?.store_id || null; }
-            catch (e) { console.warn('[AUTH] getFreshStoreId 失败:', e.message); return null; }
+            catch (e) { debugLog('[WARN]','[AUTH] getFreshStoreId 失败:', e.message); return null; }
         },
 
         getCurrentStoreName() {
@@ -327,7 +327,7 @@
                             return null;
                         }
                     } catch (e) {
-                        console.warn('[Auth] 检查门店状态失败:', e.message);
+                        debugLog('[WARN]','[Auth] 检查门店状态失败:', e.message);
                     }
                 }
 
@@ -348,7 +348,7 @@
                 const profile = await SUPABASE.getCurrentProfile();
                 this.user = profile || null;
             } catch (e) {
-                console.warn('[Auth] loadCurrentUser 失败:', e.message);
+                debugLog('[WARN]','[Auth] loadCurrentUser 失败:', e.message);
                 this.user = null;
             }
         },
@@ -359,7 +359,7 @@
                 try {
                     await window.Audit.logLogout(this.user.id, this.user.name);
                 } catch (e) {
-                    console.warn('[Auth] 审计日志记录失败:', e.message);
+                    debugLog('[WARN]','[Auth] 审计日志记录失败:', e.message);
                 }
             }
             this._clearLocalLockCache();
@@ -368,7 +368,7 @@
 
         async getAllUsers() {
             try { return await SUPABASE.getAllUsers(); }
-            catch (e) { console.warn('[AUTH] getAllUsers 失败:', e.message); return []; }
+            catch (e) { debugLog('[WARN]','[AUTH] getAllUsers 失败:', e.message); return []; }
         },
 
         // ==================== 用户管理 ====================
@@ -455,10 +455,10 @@
                 if (!fnError) {
                     authCleaned = true;
                 } else {
-                    console.warn('[Auth] delete-user Edge Function 失败:', fnError.message);
+                    debugLog('[WARN]','[Auth] delete-user Edge Function 失败:', fnError.message);
                 }
             } catch (e) {
-                console.warn('[Auth] delete-user Edge Function 未部署或调用异常:', e.message);
+                debugLog('[WARN]','[Auth] delete-user Edge Function 未部署或调用异常:', e.message);
             }
 
             // 降级：尝试 Admin API 废置账号
@@ -476,10 +476,10 @@
                     if (!updateError) {
                         authCleaned = true;
                     } else {
-                        console.warn('[Auth] Admin API 废置账号失败:', updateError.message);
+                        debugLog('[WARN]','[Auth] Admin API 废置账号失败:', updateError.message);
                     }
                 } catch (adminError) {
-                    console.warn('[Auth] Admin API 不可用:', adminError.message);
+                    debugLog('[WARN]','[Auth] Admin API 不可用:', adminError.message);
                 }
             }
 
@@ -532,10 +532,10 @@
                 if (!error) {
                     edgeSuccess = true;
                 } else {
-                    console.warn('[Auth] reset-user-password Edge Function 失败:', error.message);
+                    debugLog('[WARN]','[Auth] reset-user-password Edge Function 失败:', error.message);
                 }
             } catch (e) {
-                console.warn('[Auth] reset-user-password Edge Function 未部署:', e.message);
+                debugLog('[WARN]','[Auth] reset-user-password Edge Function 未部署:', e.message);
             }
 
             if (!edgeSuccess) {

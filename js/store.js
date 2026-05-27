@@ -81,7 +81,7 @@
                         .eq('store_id', id);
                     
                     if (error) {
-                        console.warn(`[StoreManager] 检查表 ${table} 失败:`, error.message);
+                        debugLog('[WARN]',`[StoreManager] 检查表 ${table} 失败:`, error.message);
                         continue;
                     }
                     
@@ -95,7 +95,7 @@
                     if (checkError.message && (checkError.message.includes('无法删除') || checkError.message.includes('Tidak dapat dihapus'))) {
                         throw checkError;
                     }
-                    console.warn(`[StoreManager] 检查表 ${table} 时发生异常:`, checkError.message);
+                    debugLog('[WARN]',`[StoreManager] 检查表 ${table} 时发生异常:`, checkError.message);
                 }
             }
             
@@ -252,7 +252,7 @@
                     .eq('is_voided', false);
                 if (practiceIds.length > 0) query = query.not('store_id', 'in', '(' + practiceIds.join(',') + ')');
                 const { data: allFlows, error } = await query;
-                if (error) { console.warn('批量获取门店现金流失败:', error); return {}; }
+                if (error) { debugLog('[WARN]','批量获取门店现金流失败:', error); return {}; }
                 const balances = {};
                 for (const flow of allFlows || []) {
                     const storeId = flow.store_id;
@@ -353,7 +353,7 @@
             cleanSteps.push({ name: 'customers', exec: async () => await client.from('customers').delete().eq('store_id', storeId) });
             cleanSteps.push({ name: 'blacklist', exec: async () => await client.from('blacklist').delete().eq('store_id', storeId) });
             for (const step of cleanSteps) {
-                try { await step.exec(); } catch (e) { console.warn(`清理 ${step.name} 失败:`, e.message); }
+                try { await step.exec(); } catch (e) { debugLog('[WARN]',`清理 ${step.name} 失败:`, e.message); }
             }
             SUPABASE.clearCache();
             if (window.JFCache) window.JFCache.clear();
@@ -384,7 +384,7 @@
             // 获取偿还本金数据
             const { data: returnCapitalData, error: returnError } = await client
                 .from('profit_distributions').select('store_id, amount').eq('type', 'return_capital').eq('store_id', storeId);
-            if (returnError) console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
+            if (returnError) debugLog('[WARN]','[StoreManager] 查询偿还本金失败:', returnError.message);
 
             // 获取现金流余额
             const { data: flows, error: flowError } = await client
@@ -808,7 +808,7 @@
 
                 const { data: returnCapitalData, error: returnError } = await client
                     .from('profit_distributions').select('store_id, amount').eq('type', 'return_capital');
-                if (returnError) console.warn('[StoreManager] 查询偿还本金失败:', returnError.message);
+                if (returnError) debugLog('[WARN]','[StoreManager] 查询偿还本金失败:', returnError.message);
 
                 const storeBalances = await StoreManager._getAllStoreCashFlowBalances();
 

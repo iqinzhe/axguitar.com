@@ -5,17 +5,17 @@
 'use strict';
 
 (function () {
-    var JF = window.JF || {};
+    let JF = window.JF || {};
     window.JF = JF;
 
-    var OrdersPage = {
+    let OrdersPage = {
         // ==================== 获取订单数据 ====================
         _fetchOrderData: async function(filters, from, to) {
             // overdue 不是数据库状态值，需转为 active 查询后前端过滤
-            var isOverdueFilter = (filters.status === 'overdue');
-            var dbFilters = isOverdueFilter ? Object.assign({}, filters, { status: 'active' }) : filters;
-            var result = await SUPABASE.getOrders(dbFilters, from, to);
-            var orders = result.data;
+            let isOverdueFilter = (filters.status === 'overdue');
+            let dbFilters = isOverdueFilter ? Object.assign({}, filters, { status: 'active' }) : filters;
+            let result = await SUPABASE.getOrders(dbFilters, from, to);
+            let orders = result.data;
             if (isOverdueFilter) {
                 orders = orders.filter(function(o) { return (o.overdue_days || 0) > 0; });
             }
@@ -27,7 +27,7 @@
 
         // ==================== 获取费用状态显示 ====================
         _getAdminFeeStatus: function(order, lang) {
-            var fee = order.admin_fee || 0;
+            let fee = order.admin_fee || 0;
             if (fee === 0) {
                 return '<span class="badge badge--exempt">' + (lang === 'id' ? 'Gratis' : '免费') + '</span>';
             }
@@ -38,11 +38,11 @@
         },
 
         _getServiceFeeStatus: function(order, lang) {
-            var fee = order.service_fee_amount || 0;
+            let fee = order.service_fee_amount || 0;
             if (fee === 0) {
                 return '<span class="badge badge--exempt">' + (lang === 'id' ? 'Gratis' : '免费') + '</span>';
             }
-            var paid = order.service_fee_paid || 0;
+            let paid = order.service_fee_paid || 0;
             if (paid >= fee) {
                 return '<span class="badge badge--paid">✅ ' + (lang === 'id' ? 'Lunas' : '已缴') + '</span>';
             }
@@ -51,49 +51,49 @@
 
         // ==================== 构建订单列表 HTML ====================
         buildOrderTableHTML: async function(filters, currentFrom, pageSize) {
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
-            var isAdmin = PERMISSION.isAdmin();
-            var PAGE_SIZE = pageSize || 15;
-            var page = (currentFrom && currentFrom > 0) ? currentFrom : 1;
-            var from = (page - 1) * PAGE_SIZE;
-            var to = from + PAGE_SIZE - 1;
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
+            let isAdmin = PERMISSION.isAdmin();
+            let PAGE_SIZE = pageSize || 15;
+            let page = (currentFrom && currentFrom > 0) ? currentFrom : 1;
+            let from = (page - 1) * PAGE_SIZE;
+            let to = from + PAGE_SIZE - 1;
 
-            var _a = await Promise.all([
+            let _a = await Promise.all([
                 this._fetchOrderData(filters, from, to),
                 SUPABASE.getAllStores()
             ]);
-            var ordersResult = _a[0].orders;
-            var totalCount = _a[0].totalCount;
-            var stores = _a[1];
+            let ordersResult = _a[0].orders;
+            let totalCount = _a[0].totalCount;
+            let stores = _a[1];
 
-            var allOrders = ordersResult;
-            var storeMap = {};
+            let allOrders = ordersResult;
+            let storeMap = {};
             for (var i = 0; i < stores.length; i++) {
-                var s = stores[i];
+                let s = stores[i];
                 storeMap[s.id] = s.name;
             }
 
-            var totalCols = isAdmin ? 9 : 8;
-            var statusMap = {
+            let totalCols = isAdmin ? 9 : 8;
+            let statusMap = {
                 active: t('status_active'),
                 completed: t('status_completed'),
                 liquidated: t('status_liquidated')
             };
-            var overdueText = lang === 'id' ? 'Terlambat' : '已逾期';
+            let overdueText = lang === 'id' ? 'Terlambat' : '已逾期';
 
-            var rows = '';
+            let rows = '';
             for (var idx = 0; idx < allOrders.length; idx++) {
-                var o = allOrders[idx];
-                var isOverdue = (o.status === 'active' && (o.overdue_days || 0) > 0);
-                var displayStatus = o.status;
+                let o = allOrders[idx];
+                let isOverdue = (o.status === 'active' && (o.overdue_days || 0) > 0);
+                let displayStatus = o.status;
                 if (isOverdue) displayStatus = 'overdue';
-                var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
-                var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
-                var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                var startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
-                var interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
-                var rowClass = 'order-row';
+                let statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
+                let storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
+                let remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
+                let startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
+                let interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
+                let rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
                 rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
@@ -123,25 +123,25 @@
                 renderOrdersIntoTable: this._renderOrdersIntoTable.bind(this)
             };
 
-            var totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-            var paginatorHtml = JF.OrdersPage._buildOrderPaginatorHtml(page, totalPages, PAGE_SIZE, totalCount, filters, lang);
+            let totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+            let paginatorHtml = JF.OrdersPage._buildOrderPaginatorHtml(page, totalPages, PAGE_SIZE, totalCount, filters, lang);
 
-            var filterOptions = [
+            let filterOptions = [
                 { value: 'all', label: lang === 'id' ? 'Semua Pesanan' : '全部订单' },
                 { value: 'active', label: t('active') },
                 { value: 'overdue', label: lang === 'id' ? 'Terlambat' : '已逾期' },
                 { value: 'completed', label: t('completed') },
                 { value: 'liquidated', label: lang === 'id' ? 'Dijual' : '已变卖' }
             ];
-            var filterSelectHtml = '<select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">';
+            let filterSelectHtml = '<select id="statusFilter" onchange="APP.filterOrders(this.value)" class="status-filter-select">';
             for (var fi = 0; fi < filterOptions.length; fi++) {
-                var opt = filterOptions[fi];
-                var selected = (filters.status === opt.value) ? ' selected' : '';
+                let opt = filterOptions[fi];
+                let selected = (filters.status === opt.value) ? ' selected' : '';
                 filterSelectHtml += '<option value="' + opt.value + '"' + selected + '>' + opt.label + '</option>';
             }
             filterSelectHtml += '</select>';
 
-            var content = '' +
+            let content = '' +
                 '<div class="page-header">' +
                 '<h2>📋 ' + t('order_list') + '</h2>' +
                 '<div class="header-actions">' +
@@ -195,7 +195,7 @@
                 '<div id="orderTablePaginator"></div>';
 
             setTimeout(function() {
-                var el = document.getElementById('orderTablePaginator');
+                let el = document.getElementById('orderTablePaginator');
                 if (el) el.innerHTML = paginatorHtml;
                 JF.OrdersPage._reattachOrderTableEvents();
             }, 0);
@@ -205,19 +205,19 @@
 
         _buildOrderPaginatorHtml: function(page, totalPages, pageSize, total, filters, lang) {
             if (total === 0) return '';
-            var from = (page - 1) * pageSize + 1;
-            var to = Math.min(page * pageSize, total);
-            var info = lang === 'id'
+            let from = (page - 1) * pageSize + 1;
+            let to = Math.min(page * pageSize, total);
+            let info = lang === 'id'
                 ? '<span class="jf-page-info">' + from + '–' + to + ' / ' + total + '</span>'
                 : '<span class="jf-page-info">第 ' + from + '–' + to + ' 条 / 共 ' + total + ' 条</span>';
-            var prevDisabled = page <= 1 ? ' disabled' : '';
-            var nextDisabled = page >= totalPages ? ' disabled' : '';
-            var prevLabel = lang === 'id' ? '‹ Prev' : '‹ 上一页';
-            var nextLabel = lang === 'id' ? 'Next ›' : '下一页 ›';
-            var filtersJson = JSON.stringify(filters).replace(/'/g, "\\'");
+            let prevDisabled = page <= 1 ? ' disabled' : '';
+            let nextDisabled = page >= totalPages ? ' disabled' : '';
+            let prevLabel = lang === 'id' ? '‹ Prev' : '‹ 上一页';
+            let nextLabel = lang === 'id' ? 'Next ›' : '下一页 ›';
+            let filtersJson = JSON.stringify(filters).replace(/'/g, "\\'");
 
-            var pageButtons = '';
-            var pages = [];
+            let pageButtons = '';
+            let pages = [];
             if (totalPages <= 7) {
                 for (var i = 1; i <= totalPages; i++) pages.push(i);
             } else if (page <= 4) {
@@ -232,21 +232,21 @@
                 pages.push('...'); pages.push(totalPages);
             }
             for (var pi = 0; pi < pages.length; pi++) {
-                var p = pages[pi];
+                let p = pages[pi];
                 if (p === '...') {
                     pageButtons += '<span class="jf-page-ellipsis">…</span>';
                 } else {
-                    var active = p === page ? ' jf-page-active' : '';
+                    let active = p === page ? ' jf-page-active' : '';
                     pageButtons += '<button class="jf-page-btn' + active + '" onclick="JF.OrdersPage.goToOrderPage(' + p + ')">' + p + '</button>';
                 }
             }
 
-            var sizes = [15, 25, 50];
-            var sizeOpts = sizes.map(function(s) {
+            let sizes = [15, 25, 50];
+            let sizeOpts = sizes.map(function(s) {
                 return '<option value="' + s + '"' + (s === pageSize ? ' selected' : '') + '>' + s + '</option>';
             }).join('');
-            var sizeLabel = lang === 'id' ? 'per hal' : '条/页';
-            var sizeSelector = '<select class="jf-page-size-select" onchange="JF.OrdersPage.changeOrderPageSize(this.value)">' + sizeOpts + '</select><span class="jf-page-size-label">' + sizeLabel + '</span>';
+            let sizeLabel = lang === 'id' ? 'per hal' : '条/页';
+            let sizeSelector = '<select class="jf-page-size-select" onchange="JF.OrdersPage.changeOrderPageSize(this.value)">' + sizeOpts + '</select><span class="jf-page-size-label">' + sizeLabel + '</span>';
 
             return '<div class="jf-paginator">' +
                 info +
@@ -260,17 +260,17 @@
         },
 
         goToOrderPage: async function(page) {
-            var state = window._orderTableState;
+            let state = window._orderTableState;
             if (!state) return;
-            var lang = Utils.lang;
-            var paginator = document.getElementById('orderTablePaginator');
+            let lang = Utils.lang;
+            let paginator = document.getElementById('orderTablePaginator');
             if (paginator) paginator.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);">⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...') + '</div>';
             try {
-                var html = await JF.OrdersPage.buildOrderTableHTML(state.filters, page, state.pageSize);
-                var newHtmlDiv = document.createElement('div');
+                let html = await JF.OrdersPage.buildOrderTableHTML(state.filters, page, state.pageSize);
+                let newHtmlDiv = document.createElement('div');
                 newHtmlDiv.innerHTML = html;
-                var newCard = newHtmlDiv.querySelector('.order-table-card');
-                var newPaginator = newHtmlDiv.querySelector('#orderTablePaginator');
+                let newCard = newHtmlDiv.querySelector('.order-table-card');
+                let newPaginator = newHtmlDiv.querySelector('#orderTablePaginator');
                 if (newCard) document.querySelector('.order-table-card').outerHTML = newCard.outerHTML;
                 if (newPaginator) document.getElementById('orderTablePaginator').innerHTML = newPaginator.innerHTML;
                 JF.OrdersPage._reattachOrderTableEvents();
@@ -281,39 +281,39 @@
         },
 
         changeOrderPageSize: async function(newSize) {
-            var state = window._orderTableState;
+            let state = window._orderTableState;
             if (!state) return;
             state.pageSize = parseInt(newSize, 10);
             await JF.OrdersPage.goToOrderPage(1);
         },
 
         _renderOrdersIntoTable: function(orders, append) {
-            var tbody = document.getElementById('orderTableBody');
+            let tbody = document.getElementById('orderTableBody');
             if (!tbody) return;
 
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
-            var isAdmin = PERMISSION.isAdmin();
-            var state = window._orderTableState;
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
+            let isAdmin = PERMISSION.isAdmin();
+            let state = window._orderTableState;
             if (!state) return;
 
-            var storeMap = state.storeMap || {};
-            var totalCols = state.totalCols;
-            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
-            var overdueText = lang === 'id' ? 'Terlambat' : '已逾期';
+            let storeMap = state.storeMap || {};
+            let totalCols = state.totalCols;
+            let statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            let overdueText = lang === 'id' ? 'Terlambat' : '已逾期';
 
-            var rows = '';
+            let rows = '';
             for (var i = 0; i < orders.length; i++) {
-                var o = orders[i];
-                var isOverdue = (o.status === 'active' && (o.overdue_days || 0) > 0);
-                var displayStatus = o.status;
+                let o = orders[i];
+                let isOverdue = (o.status === 'active' && (o.overdue_days || 0) > 0);
+                let displayStatus = o.status;
                 if (isOverdue) displayStatus = 'overdue';
-                var statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
-                var storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
-                var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                var startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
-                var interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
-                var rowClass = 'order-row';
+                let statusText = isOverdue ? overdueText : (statusMap[o.status] || o.status);
+                let storeName = isAdmin ? (storeMap[o.store_id] || '-') : '';
+                let remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
+                let startDate = o.custom_order_date ? Utils.formatDate(o.custom_order_date) : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
+                let interestRatePct = ((o.agreed_interest_rate || 0) * 100).toFixed(1) + '%';
+                let rowClass = 'order-row';
                 if (isOverdue) rowClass += ' order-row--overdue';
 
                 rows += '<tr class="' + rowClass + '" data-order-id="' + Utils.escapeHtml(o.order_id) + '" data-order-status="' + o.status + '" data-is-overdue="' + isOverdue + '">' +
@@ -330,7 +330,7 @@
             }
 
             if (append) {
-                var loadMoreRow = document.getElementById('loadMoreRow');
+                let loadMoreRow = document.getElementById('loadMoreRow');
                 if (loadMoreRow) loadMoreRow.remove();
                 tbody.insertAdjacentHTML('beforeend', rows);
             } else {
@@ -339,20 +339,20 @@
         },
 
         _bindRowClickDelegate: function() {
-            var tbody = document.getElementById('orderTableBody');
+            let tbody = document.getElementById('orderTableBody');
             if (!tbody) return;
             if (tbody._rowClickHandler) {
                 tbody.removeEventListener('click', tbody._rowClickHandler);
             }
-            var self = this;
-            var handler = function(e) {
-                var row = e.target.closest('.order-row');
+            let self = this;
+            let handler = function(e) {
+                let row = e.target.closest('.order-row');
                 if (!row) return;
                 if (e.target.closest('button')) return;
-                var orderId = row.dataset.orderId;
-                var orderStatus = row.dataset.orderStatus;
+                let orderId = row.dataset.orderId;
+                let orderStatus = row.dataset.orderStatus;
                 if (!orderId) return;
-                var allRows = document.querySelectorAll('#orderTableBody .order-row');
+                let allRows = document.querySelectorAll('#orderTableBody .order-row');
                 for (var i = 0; i < allRows.length; i++) {
                     allRows[i].classList.remove('row-selected');
                 }
@@ -370,12 +370,12 @@
         },
 
         _updateSelectedDisplay: function() {
-            var displaySpan = document.getElementById('selectedOrderDisplay');
+            let displaySpan = document.getElementById('selectedOrderDisplay');
             if (!displaySpan) return;
-            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
-            var lang = Utils.lang;
+            let selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            let lang = Utils.lang;
             if (selectedRow && selectedRow.dataset.orderId) {
-                var orderId = selectedRow.dataset.orderId;
+                let orderId = selectedRow.dataset.orderId;
                 displaySpan.textContent = (lang === 'id' ? '✅ Terpilih: ' : '✅ 已选中: ') + orderId;
                 displaySpan.style.color = 'var(--success-dark)';
                 displaySpan.style.background = 'var(--success-soft, #d1fae5)';
@@ -395,7 +395,7 @@
         },
 
         _clearSelection: function() {
-            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            let selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
             if (selectedRow) selectedRow.classList.remove('row-selected');
             if (window._orderTableState) {
                 window._orderTableState.selectedOrderId = null;
@@ -405,21 +405,21 @@
         },
 
         _getSelectedOrderId: function() {
-            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            let selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
             if (selectedRow && selectedRow.dataset.orderId) return selectedRow.dataset.orderId;
-            var state = window._orderTableState;
+            let state = window._orderTableState;
             return state ? state.selectedOrderId : null;
         },
 
         _getSelectedOrderStatus: function() {
-            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            let selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
             if (selectedRow && selectedRow.dataset.orderStatus) return selectedRow.dataset.orderStatus;
-            var state = window._orderTableState;
+            let state = window._orderTableState;
             return state ? state.selectedOrderStatus : null;
         },
 
         _getSelectedIsOverdue: function() {
-            var selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
+            let selectedRow = document.querySelector('#orderTableBody .order-row.row-selected');
             if (selectedRow && selectedRow.dataset.isOverdue) return selectedRow.dataset.isOverdue === 'true';
             return false;
         },
@@ -437,43 +437,43 @@
         },
 
         _globalViewOrder: async function() {
-            var lang = Utils.lang;
-            var orderId = this._getSelectedOrderId();
+            let lang = Utils.lang;
+            let orderId = this._getSelectedOrderId();
             if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan terlebih dahulu' : '请先点击选中一个订单'); return; }
             await this.viewOrder(orderId);
         },
 
         _globalPrintOrder: async function() {
-            var lang = Utils.lang;
-            var orderId = this._getSelectedOrderId();
+            let lang = Utils.lang;
+            let orderId = this._getSelectedOrderId();
             if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             await this.printOrder(orderId);
         },
 
         _globalPayOrder: async function() {
-            var lang = Utils.lang;
-            var orderId = this._getSelectedOrderId();
-            var orderStatus = this._getSelectedOrderStatus();
+            let lang = Utils.lang;
+            let orderId = this._getSelectedOrderId();
+            let orderStatus = this._getSelectedOrderStatus();
             if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             if (!this._canPayOrder(orderStatus, PERMISSION.isAdmin())) {
                 Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat dibayar' : '只有进行中的订单可以缴费');
                 return;
             }
-            var isOverdue = this._getSelectedIsOverdue();
+            let isOverdue = this._getSelectedIsOverdue();
             if (isOverdue) {
-                var confirmMsg = lang === 'id' ? '⚠️ Pesanan terlambat. Pembayaran akan mencakup bunga tertunggak. Lanjutkan?' : '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？';
-                var ok = await Utils.toast.confirm(confirmMsg);
+                let confirmMsg = lang === 'id' ? '⚠️ Pesanan terlambat. Pembayaran akan mencakup bunga tertunggak. Lanjutkan?' : '⚠️ 订单已逾期，缴费将补缴逾期利息。是否继续？';
+                let ok = await Utils.toast.confirm(confirmMsg);
                 if (!ok) return;
             }
             await this.payOrder(orderId);
         },
 
         _globalEditOrder: async function() {
-            var lang = Utils.lang;
-            var isAdmin = PERMISSION.isAdmin();
+            let lang = Utils.lang;
+            let isAdmin = PERMISSION.isAdmin();
             if (!isAdmin) { Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat mengedit pesanan' : '仅管理员可修改订单'); return; }
-            var orderId = this._getSelectedOrderId();
-            var orderStatus = this._getSelectedOrderStatus();
+            let orderId = this._getSelectedOrderId();
+            let orderStatus = this._getSelectedOrderStatus();
             if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             if (!this._canEditOrder(orderStatus, true)) {
                 Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat diedit' : '只有进行中的订单可以修改');
@@ -487,11 +487,11 @@
         },
 
         _globalDeleteOrder: async function() {
-            var lang = Utils.lang;
-            var isAdmin = PERMISSION.isAdmin();
+            let lang = Utils.lang;
+            let isAdmin = PERMISSION.isAdmin();
             if (!isAdmin) { Utils.toast.warning(lang === 'id' ? 'Hanya admin yang dapat menghapus pesanan' : '仅管理员可删除订单'); return; }
-            var orderId = this._getSelectedOrderId();
-            var orderStatus = this._getSelectedOrderStatus();
+            let orderId = this._getSelectedOrderId();
+            let orderStatus = this._getSelectedOrderStatus();
             if (!orderId) { Utils.toast.warning(lang === 'id' ? 'Silakan pilih satu pesanan' : '请先选中一个订单'); return; }
             if (!this._canDeleteOrder(orderStatus, true)) {
                 Utils.toast.warning(lang === 'id' ? 'Hanya pesanan aktif yang dapat dihapus' : '只有进行中的订单可以删除');
@@ -502,11 +502,11 @@
         },
 
         _bindGlobalEvents: function() {
-            var viewBtn = document.getElementById('globalViewBtn');
-            var printBtn = document.getElementById('globalPrintBtn');
-            var payBtn = document.getElementById('globalPayBtn');
-            var editBtn = document.getElementById('globalEditBtn');
-            var deleteBtn = document.getElementById('globalDeleteBtn');
+            let viewBtn = document.getElementById('globalViewBtn');
+            let printBtn = document.getElementById('globalPrintBtn');
+            let payBtn = document.getElementById('globalPayBtn');
+            let editBtn = document.getElementById('globalEditBtn');
+            let deleteBtn = document.getElementById('globalDeleteBtn');
             if (viewBtn) viewBtn.onclick = this._globalViewOrder.bind(this);
             if (printBtn) printBtn.onclick = this._globalPrintOrder.bind(this);
             if (payBtn) payBtn.onclick = this._globalPayOrder.bind(this);
@@ -515,7 +515,7 @@
         },
 
         _reattachOrderTableEvents: function() {
-            var self = JF.OrdersPage;
+            let self = JF.OrdersPage;
             self._bindRowClickDelegate();
             self._bindGlobalEvents();
             self._updateSelectedDisplay();
@@ -524,14 +524,14 @@
         showOrderTable: async function() {
             APP.currentPage = 'orderTable';
             APP.saveCurrentPageState();
-            var isAdmin = PERMISSION.isAdmin();
-            var defaultStatus = isAdmin ? 'all' : 'active';
-            var currentStatus = APP.currentFilter || defaultStatus;
+            let isAdmin = PERMISSION.isAdmin();
+            let defaultStatus = isAdmin ? 'all' : 'active';
+            let currentStatus = APP.currentFilter || defaultStatus;
             APP.currentFilter = currentStatus;
-            var filters = { status: currentStatus };
-            var contentHTML = await this.buildOrderTableHTML(filters, 1, 15);
+            let filters = { status: currentStatus };
+            let contentHTML = await this.buildOrderTableHTML(filters, 1, 15);
             document.getElementById("app").innerHTML = contentHTML;
-            var self = this;
+            let self = this;
             setTimeout(function() {
                 self._bindRowClickDelegate();
                 self._bindGlobalEvents();
@@ -540,18 +540,18 @@
         },
 
         loadMoreOrders: async function() {
-            var state = window._orderTableState;
+            let state = window._orderTableState;
             if (!state) return;
-            var lang = Utils.lang;
-            var loadMoreBtn = document.querySelector('#loadMoreRow button');
+            let lang = Utils.lang;
+            let loadMoreBtn = document.querySelector('#loadMoreRow button');
             if (loadMoreBtn) {
                 loadMoreBtn.disabled = true;
                 loadMoreBtn.textContent = '⏳ ' + (lang === 'id' ? 'Memuat...' : '加载中...');
             }
             try {
-                var result = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
-                var orders = result.orders;
-                var totalCount = result.totalCount;
+                let result = await this._fetchOrderData(state.filters, state.currentFrom, state.currentFrom + state.pageSize - 1);
+                let orders = result.orders;
+                let totalCount = result.totalCount;
                 state.allOrders = state.allOrders.concat(orders);
                 state.currentFrom += orders.length;
                 state.totalCount = totalCount;
@@ -568,25 +568,25 @@
         },
 
         _updateLoadMoreRow: function() {
-            var state = window._orderTableState;
+            let state = window._orderTableState;
             if (!state) return;
-            var tbody = document.getElementById('orderTableBody');
+            let tbody = document.getElementById('orderTableBody');
             if (!tbody) return;
-            var existingRow = document.getElementById('loadMoreRow');
+            let existingRow = document.getElementById('loadMoreRow');
             if (existingRow) existingRow.remove();
             // 有分页器时不显示"加载更多"行，避免两套系统冲突
-            var paginator = document.getElementById('orderTablePaginator');
+            let paginator = document.getElementById('orderTablePaginator');
             if (paginator && paginator.innerHTML.trim()) return;
-            var lang = Utils.lang;
+            let lang = Utils.lang;
             if (state.currentFrom < state.totalCount) {
-                var remaining = state.totalCount - state.currentFrom;
-                var btn = '<button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? 'Muat lebih banyak' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')</button>';
-                var row = document.createElement('tr');
+                let remaining = state.totalCount - state.currentFrom;
+                let btn = '<button onclick="APP.loadMoreOrders()" class="btn btn--primary btn--sm" style="padding:10px 32px;font-size:14px;">⬇️ ' + (lang === 'id' ? 'Muat lebih banyak' : '加载更多') + ' (' + remaining + ' ' + (lang === 'id' ? 'tersisa' : '剩余') + ')</button>';
+                let row = document.createElement('tr');
                 row.id = 'loadMoreRow';
                 row.innerHTML = '<td colspan="' + state.totalCols + '" style="text-align:center;padding:14px;">' + btn + '</td>';
                 tbody.appendChild(row);
             } else if (state.totalCount > 0) {
-                var row2 = document.createElement('tr');
+                let row2 = document.createElement('tr');
                 row2.id = 'loadMoreRow';
                 row2.innerHTML = '<td colspan="' + state.totalCols + '" style="text-align:center;padding:14px;color:var(--text-muted);">✅ ' + (lang === 'id' ? '已加载全部 ' + state.totalCount + ' 条订单' : '已加载全部 ' + state.totalCount + ' 条订单') + '</td>';
                 tbody.appendChild(row2);
@@ -607,10 +607,10 @@
         },
 
         deleteOrder: async function(orderId) {
-            var confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
+            let confirmed = await Utils.toast.confirm(Utils.t('confirm_delete'));
             if (!confirmed) return;
             try {
-                var order = await SUPABASE.getOrder(orderId);
+                let order = await SUPABASE.getOrder(orderId);
                 if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
                 await Order.delete(orderId);
                 if (window.Audit) await window.Audit.logOrderDelete(order.order_id, order.customer_name, order.loan_amount, AUTH.user ? AUTH.user.name : null);
@@ -624,15 +624,15 @@
         },
 
         printOrder: async function(orderId) {
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
             try {
-                var result = await SUPABASE.getPaymentHistory(orderId);
-                var order = result.order;
+                let result = await SUPABASE.getPaymentHistory(orderId);
+                let order = result.order;
                 if (!order) { Utils.toast.error(Utils.t('order_not_found')); return; }
-                var profile = await SUPABASE.getCurrentProfile();
-                var isAdmin = PERMISSION.isAdmin();
-                var storeName = '', roleText = '', userName = '';
+                let profile = await SUPABASE.getCurrentProfile();
+                let isAdmin = PERMISSION.isAdmin();
+                let storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
                     roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
@@ -640,45 +640,45 @@
                                (lang === 'id' ? 'Staf' : '员工');
                     userName = AUTH.user ? (AUTH.user.name || '-') : '-';
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
-                var printDateTime = new Date().toLocaleString();
-                var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-                var monthlyRate = order.agreed_interest_rate || 0.10;
-                var currentMonthlyInterest = remainingPrincipal * monthlyRate;
-                var statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
+                let printDateTime = new Date().toLocaleString();
+                let remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+                let monthlyRate = order.agreed_interest_rate || 0.10;
+                let currentMonthlyInterest = remainingPrincipal * monthlyRate;
+                let statusText = order.status === 'active' ? (lang === 'id' ? 'Aktif' : '进行中') :
                                    order.status === 'completed' ? (lang === 'id' ? 'Lunas' : '已结清') :
                                    (lang === 'id' ? 'Dijual' : '已变卖');
-                var isFixed = order.repayment_type === 'fixed';
-                var repaymentText = isFixed ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
+                let isFixed = order.repayment_type === 'fixed';
+                let repaymentText = isFixed ? (lang === 'id' ? 'Cicilan Tetap' : '固定还款') :
                                      (lang === 'id' ? 'Cicilan Bebas' : '灵活还款');
 
                 // 建立订单日期
-                var printOrderStartDate = order.custom_order_date
+                let printOrderStartDate = order.custom_order_date
                     ? Utils.formatDate(order.custom_order_date)
                     : (order.created_at ? Utils.formatDate(order.created_at) : '-');
 
                 // 到期日（仅固定还款）
-                var printMaturityDateStr = '-';
+                let printMaturityDateStr = '-';
                 if (isFixed && order.repayment_term) {
-                    var printStartRaw = order.custom_order_date || order.created_at;
+                    let printStartRaw = order.custom_order_date || order.created_at;
                     if (printStartRaw) {
-                        var printMatDate = new Date(printStartRaw);
+                        let printMatDate = new Date(printStartRaw);
                         printMatDate.setMonth(printMatDate.getMonth() + (order.repayment_term || 0));
                         printMaturityDateStr = Utils.formatDate(printMatDate.toISOString().substring(0, 10));
                     }
                 }
 
                 // 固定还款：期数信息
-                var printPaidMonths = order.fixed_paid_months || 0;
-                var printTotalMonths = order.repayment_term || 0;
-                var printRemainingMonths = printTotalMonths - printPaidMonths;
-                var printFixedPayment = order.monthly_fixed_payment || 0;
+                let printPaidMonths = order.fixed_paid_months || 0;
+                let printTotalMonths = order.repayment_term || 0;
+                let printRemainingMonths = printTotalMonths - printPaidMonths;
+                let printFixedPayment = order.monthly_fixed_payment || 0;
 
-                var customerPhone = order.customer_phone || order.phone || '-';
-                var orderNotes    = order.notes || '-';
-                var repayTypeLabel = repaymentText + (isFixed ? ' (' + (order.repayment_term||0) + (lang==='id'?' bln':' 个月') + ')' : '');
+                let customerPhone = order.customer_phone || order.phone || '-';
+                let orderNotes    = order.notes || '-';
+                let repayTypeLabel = repaymentText + (isFixed ? ' (' + (order.repayment_term||0) + (lang==='id'?' bln':' 个月') + ')' : '');
 
                 // 统一 3行4列布局（固定/灵活还款共用）
-                var infoItems = [
+                let infoItems = [
                     // 行1
                     { label: lang==='id' ? 'ID Pesanan'      : '订单号',   value: order.order_id },
                     { label: lang==='id' ? 'Tgl. Mulai'      : '起始日期', value: printOrderStartDate },
@@ -695,17 +695,17 @@
                     { label: lang==='id' ? 'Catatan'         : '订单备注',   value: orderNotes },
                     { label: lang==='id' ? 'Status'          : '订单状态',   value: statusText },
                 ];
-                var orderInfoGrid = '<div class="order-info-grid">';
+                let orderInfoGrid = '<div class="order-info-grid">';
                 for (var i = 0; i < infoItems.length; i++) {
-                    var item = infoItems[i];
+                    let item = infoItems[i];
                     orderInfoGrid += '<div class="info-item"><div class="label">' + Utils.escapeHtml(item.label) + '</div><div class="value">' + Utils.escapeHtml(item.value) + '</div></div>';
                 }
                 orderInfoGrid += '</div>';
-                var paymentRows = '';
+                let paymentRows = '';
                 if (result.payments && result.payments.length > 0) {
                     for (var pIdx = 0; pIdx < result.payments.length; pIdx++) {
-                        var p = result.payments[pIdx];
-                        var typeText = p.type === 'admin_fee' ? t('admin_fee') : 
+                        let p = result.payments[pIdx];
+                        let typeText = p.type === 'admin_fee' ? t('admin_fee') : 
                                          p.type === 'service_fee' ? t('service_fee') : 
                                          p.type === 'interest' ? t('interest') : t('principal');
                         paymentRows += '<tr>' +
@@ -719,7 +719,7 @@
                 } else {
                     paymentRows = '<tr><td colspan="5" class="text-center">' + (lang === 'id' ? 'Tidak ada' : '无') + '</td></tr>';
                 }
-                var printWindow = window.open('', '_blank');
+                let printWindow = window.open('', '_blank');
                 printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + ' - ' + Utils.escapeHtml(order.order_id) + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 9pt; line-height: 1.3; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 14pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 28px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 9pt; color: #475569; margin: 4px 0 8px; text-align: center; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 12px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\n.page-title { font-size: 14pt; font-weight: bold; margin: 12px 0; color: #1e293b; }\n.order-info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; margin-bottom: 12px; }\n.info-item { padding: 4px 0; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }\n.info-item .label { font-size: 7pt; color: #64748b; margin-bottom: 2px; }\n.info-item .value { font-size: 9.5pt; font-weight: 500; color: #1e293b; }\n.info-disclaimer { font-size: 7.5pt; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; line-height: 1.5; }\n.card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 10px; }\n.card h3 { font-size: 10pt; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }\ntable { width: 100%; border-collapse: collapse; margin: 6px 0; }\nthead { display: table-header-group; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; }\nth, td { border: 1px solid #cbd5e1; padding: 5px 8px; text-align: left; font-size: 8pt; vertical-align: top; }\n.text-right { text-align: right; }\n.text-center { text-align: center; }\n@media print { @page { size: A4; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? 'Pusat' : '总部') : (lang === 'id' ? 'Toko: ' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n<h1 class="page-title">📄 ' + (lang === 'id' ? 'Detail Pesanan' : '订单详情') + '</h1>\n<div class="card">\n<h3>📋 ' + (lang === 'id' ? 'Informasi Pesanan' : '订单信息') + '</h3>\n' + orderInfoGrid + '\n<h3>📋 ' + (lang === 'id' ? 'Riwayat Pembayaran' : '缴费记录') + '</h3>\n<table>\n<thead>\n<tr>\n<th>' + t('date') + '</th>\n<th>' + t('type') + '</th>\n<th class="text-right">' + t('amount') + '</th>\n<th>' + t('payment_method') + '</th>\n<th>' + t('description') + '</th>\n</tr>\n</thead>\n<tbody>' + paymentRows + '</tbody>\n</table>\n</div>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
@@ -731,27 +731,27 @@
         showPaymentHistory: async function() {
             APP.currentPage = 'paymentHistory';
             APP.saveCurrentPageState();
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
             try {
-                var allPayments = await SUPABASE.getAllPayments();
-                var totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
+                let allPayments = await SUPABASE.getAllPayments();
+                let totalAdminFee = 0, totalServiceFee = 0, totalInterest = 0, totalPrincipal = 0;
                 for (var i = 0; i < allPayments.length; i++) {
-                    var p = allPayments[i];
+                    let p = allPayments[i];
                     if (p.type === 'admin_fee') totalAdminFee += p.amount;
                     else if (p.type === 'service_fee') totalServiceFee += p.amount;
                     else if (p.type === 'interest') totalInterest += p.amount;
                     else if (p.type === 'principal') totalPrincipal += p.amount;
                 }
-                var typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
-                var methodMap = { cash: t('cash'), bank: t('bank') };
-                var rows = '';
+                let typeMap = { admin_fee: t('admin_fee'), service_fee: t('service_fee'), interest: t('interest'), principal: t('principal') };
+                let methodMap = { cash: t('cash'), bank: t('bank') };
+                let rows = '';
                 if (allPayments.length === 0) {
                     rows = '<tr><td colspan="8" class="text-center">' + t('no_data') + '</td></tr>';
                 } else {
                     for (var idx = 0; idx < allPayments.length; idx++) {
-                        var p2 = allPayments[idx];
-                        var methodClass = p2.payment_method === 'cash' ? 'cash' : 'bank';
+                        let p2 = allPayments[idx];
+                        let methodClass = p2.payment_method === 'cash' ? 'cash' : 'bank';
                         rows += '<tr>' +
                             '<td class="order-id">' + Utils.escapeHtml(p2.orders ? p2.orders.order_id : '-') + '</td>' +
                             '<td>' + Utils.escapeHtml(p2.orders ? p2.orders.customer_name : '-') + '</td>' +
@@ -788,35 +788,35 @@
         },
 
         printAllOrders: async function() {
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
-            var isAdmin = PERMISSION.isAdmin();
-            var filters = { status: APP.currentFilter || 'all' };
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
+            let isAdmin = PERMISSION.isAdmin();
+            let filters = { status: APP.currentFilter || 'all' };
             try {
-                var MAX_PRINT_ORDERS = 500;
+                let MAX_PRINT_ORDERS = 500;
                 Utils.toast.info(lang === 'id' ? '⏳ Mempersiapkan data cetak...' : '⏳ 正在准备打印数据...', 2000);
-                var result = await this._fetchOrderData(filters, 0, MAX_PRINT_ORDERS);
-                var orders = result.orders;
-                var totalCount = result.totalCount;
+                let result = await this._fetchOrderData(filters, 0, MAX_PRINT_ORDERS);
+                let orders = result.orders;
+                let totalCount = result.totalCount;
                 if (totalCount > MAX_PRINT_ORDERS) {
                     Utils.toast.warning(lang === 'id' ? '⚠️ 仅打印前 ' + MAX_PRINT_ORDERS + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '⚠️ 仅打印前 ' + MAX_PRINT_ORDERS + ' 条订单（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。', 5000);
                 }
                 if (orders.length === 0) { Utils.toast.warning(lang === 'id' ? 'Tidak ada data untuk dicetak' : '没有可打印的数据'); return; }
-                var stores = await SUPABASE.getAllStores();
-                var storeMap = {};
+                let stores = await SUPABASE.getAllStores();
+                let storeMap = {};
                 for (var sIdx = 0; sIdx < stores.length; sIdx++) { var s = stores[sIdx]; storeMap[s.id] = s.name; }
-                var rows = '';
+                let rows = '';
                 for (var oIdx = 0; oIdx < orders.length; oIdx++) {
-                    var o = orders[oIdx];
-                    var orderStartDate = o.custom_order_date
+                    let o = orders[oIdx];
+                    let orderStartDate = o.custom_order_date
                         ? Utils.formatDate(o.custom_order_date)
                         : (o.created_at ? Utils.formatDate(o.created_at.substring(0, 10)) : '-');
-                    var remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
-                    var currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
-                    var repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Bebas' : '灵活');
-                    var adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
-                    var serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
-                    var statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
+                    let remainingPrincipal = (o.loan_amount || 0) - (o.principal_paid || 0);
+                    let currentMonthlyInterest = remainingPrincipal * (o.agreed_interest_rate || 0.10);
+                    let repaymentTypeText = o.repayment_type === 'fixed' ? (lang === 'id' ? 'Tetap' : '固定') : (lang === 'id' ? 'Bebas' : '灵活');
+                    let adminFeeStatus = OrdersPage._getAdminFeeStatus(o, lang);
+                    let serviceFeeStatus = OrdersPage._getServiceFeeStatus(o, lang);
+                    let statusText = o.status === 'active' ? t('status_active') : (o.status === 'completed' ? t('status_completed') : t('status_liquidated'));
                     rows += '<tr>' +
                         '<td>' + Utils.escapeHtml(o.order_id) + '</td>' +
                         '<td class="text-center">' + orderStartDate + '</td>' +
@@ -833,7 +833,7 @@
                         (isAdmin ? '<td class="text-center">' + Utils.escapeHtml(storeMap[o.store_id] || '-') + '</td>' : '') +
                         '</tr>';
                 }
-                var headerHtml = '<tr>' +
+                let headerHtml = '<tr>' +
                     '<th>' + t('order_id') + '</th>' +
                     '<th class="text-center">' + (lang === 'id' ? 'Tgl. Mulai' : '起始日期') + '</th>' +
                     '<th>' + t('customer_name') + '</th>' +
@@ -848,7 +848,7 @@
                     '<th class="text-center">' + t('status') + '</th>' +
                     (isAdmin ? '<th class="text-center">' + t('store') + '</th>' : '') +
                     '</tr>';
-                var storeName = '', roleText = '', userName = '';
+                let storeName = '', roleText = '', userName = '';
                 try {
                     storeName = AUTH.getCurrentStoreName();
                     roleText = AUTH.isAdmin() ? (lang === 'id' ? 'Administrator' : '管理员') :
@@ -856,8 +856,8 @@
                                (lang === 'id' ? 'Staf' : '员工');
                     userName = AUTH.user ? (AUTH.user.name || '-') : '-';
                 } catch (e) { storeName = '-'; roleText = '-'; userName = '-'; }
-                var printDateTime = new Date().toLocaleString();
-                var printWindow = window.open('', '_blank');
+                let printDateTime = new Date().toLocaleString();
+                let printWindow = window.open('', '_blank');
                 printWindow.document.write('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<title>JF! by Gadai - ' + (lang === 'id' ? 'Daftar Pesanan' : '订单列表') + '</title>\n<style>\n* { box-sizing: border-box; margin: 0; padding: 0; }\nbody { font-family: \'Segoe UI\', Arial, sans-serif; font-size: 7.5pt; color: #1e293b; }\n.print-container { padding: 5mm; }\n.print-header { text-align: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e293b; }\n.print-header .logo { font-size: 13pt; font-weight: bold; color: #0e7490; display: flex; align-items: center; justify-content: center; gap: 8px; }\n.print-header .logo img { height: 26px; width: auto; vertical-align: middle; }\n.print-header-info { font-size: 8pt; color: #475569; margin: 3px 0 6px; text-align: center; }\n.page-title { font-size: 11pt; font-weight: bold; margin: 8px 0 6px; color: #1e293b; }\n.print-footer { text-align: center; font-size: 7pt; color: #94a3b8; margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; white-space: nowrap; }\ntable { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }\nth { background: #f1f5f9; font-weight: 600; text-align: left; padding: 4px 5px; border: 1px solid #cbd5e1; white-space: nowrap; font-size: 7pt; }\ntd { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7pt; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }\ntbody tr { break-inside: avoid; page-break-inside: avoid; }\nthead { display: table-header-group; }\n.amount { text-align: right; }\n.text-center { text-align: center; }\ncol.col-id       { width: 14mm; }\ncol.col-start    { width: 16mm; }\ncol.col-customer { width: 24mm; }\ncol.col-phone    { width: 22mm; }\ncol.col-collat   { width: 24mm; }\ncol.col-loan     { width: 20mm; }\ncol.col-interest { width: 18mm; }\ncol.col-paid     { width: 12mm; }\ncol.col-type     { width: 11mm; }\ncol.col-status   { width: 12mm; }\ncol.col-store    { width: 16mm; }\n.print-warning { background: #fef3c7; color: #d97706; padding: 8px; margin-bottom: 12px; border-radius: 4px; font-size: 8pt; text-align: center; }\n@media print { @page { size: A4 landscape; margin: 8mm; } body { margin: 0; padding: 0; } .print-container { padding: 0; } }\n</style>\n</head>\n<body>\n<div class="print-container">\n<div class="print-header">\n<div class="logo">\n<img src="icons/pagehead-logo.png" alt="JF!" onerror="this.style.display=\'none\'">\nJF! by Gadai\n</div>\n<div class="print-header-info">\n🏪 ' + (isAdmin ? (lang === 'id' ? 'Pusat' : '总部') : (lang === 'id' ? 'Toko: ' : '门店：') + Utils.escapeHtml(storeName)) + ' &nbsp;|&nbsp; 👤 ' + Utils.escapeHtml(roleText) + ' &nbsp;|&nbsp; 📅 ' + printDateTime + '\n</div>\n</div>\n' + (totalCount > MAX_PRINT_ORDERS ? '<div class="print-warning">⚠️ ' + (lang === 'id' ? '仅打印 ' + orders.length + ' 条（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。' : '仅打印 ' + orders.length + ' 条（共 ' + totalCount + ' 条）。请使用筛选条件分批打印。') + '</div>\n' : '') + '<div class="page-title">📋 ' + (lang === 'id' ? 'Daftar Pesanan' : '订单列表') + ' &nbsp;<small style="font-size:8pt;font-weight:normal;color:#64748b;">' + (lang === 'id' ? 'Total' : '共') + ' ' + orders.length + ' ' + (lang === 'id' ? 'data' : '条') + '</small></div>\n<table>\n<colgroup>\n<col class="col-id">\n<col class="col-start">\n<col class="col-customer">\n<col class="col-phone">\n<col class="col-collat">\n<col class="col-loan">\n<col class="col-interest">\n<col class="col-paid">\n<col class="col-type">\n<col class="col-status">\n<col class="col-status">\n<col class="col-status">\n' + (isAdmin ? '<col class="col-store">' : '') + '\n</colgroup>\n<thead>' + headerHtml + '</thead>\n<tbody>' + rows + '</tbody>\n</table>\n<div class="print-footer">JF! by Gadai — ' + (lang === 'id' ? 'Sistem Manajemen Gadai' : '典当管理系统') + ' &nbsp;|&nbsp; 1/1</div>\n</div>\n<script>\nwindow.onload = function() { window.print(); setTimeout(function() { window.close(); }, 800); };\n<\/script>\n</body>\n</html>');
                 printWindow.document.close();
             } catch (error) {
@@ -867,50 +867,50 @@
         },
 
         renderViewOrderHTML: async function(orderId) {
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
-            var profile = await SUPABASE.getCurrentProfile();
-            var result = await SUPABASE.getPaymentHistory(orderId);
-            var isAdmin = PERMISSION.isAdmin();
-            var order = result.order;
-            var payments = result.payments;
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
+            let profile = await SUPABASE.getCurrentProfile();
+            let result = await SUPABASE.getPaymentHistory(orderId);
+            let isAdmin = PERMISSION.isAdmin();
+            let order = result.order;
+            let payments = result.payments;
             if (!order) throw new Error('order_not_found');
-            var statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
-            var methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
-            var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
-            var monthlyRate = order.agreed_interest_rate || 0.10;
-            var currentMonthlyInterest = remainingPrincipal * monthlyRate;
-            var nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
-            var adminFeeStatus = order.admin_fee === 0 ? (lang === 'id' ? 'Gratis' : '免费') : (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴'));
-            var serviceFeeAmount = order.service_fee_amount || 0;
-            var serviceFeePaid = order.service_fee_paid || 0;
-            var serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? 'Gratis' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴'));
+            let statusMap = { active: t('status_active'), completed: t('status_completed'), liquidated: t('status_liquidated') };
+            let methodMap = { cash: lang === 'id' ? '🏦 Tunai' : '💰 现金', bank: lang === 'id' ? '🏧 Bank BNI' : '🏦 银行BNI' };
+            let remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+            let monthlyRate = order.agreed_interest_rate || 0.10;
+            let currentMonthlyInterest = remainingPrincipal * monthlyRate;
+            let nextDueDate = order.next_interest_due_date ? Utils.formatDate(order.next_interest_due_date) : '-';
+            let adminFeeStatus = order.admin_fee === 0 ? (lang === 'id' ? 'Gratis' : '免费') : (order.admin_fee_paid ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴'));
+            let serviceFeeAmount = order.service_fee_amount || 0;
+            let serviceFeePaid = order.service_fee_paid || 0;
+            let serviceFeeStatus = serviceFeeAmount === 0 ? (lang === 'id' ? 'Gratis' : '免费') : (serviceFeePaid >= serviceFeeAmount ? '✅ ' + (lang === 'id' ? 'Lunas' : '已缴') : '❌ ' + (lang === 'id' ? 'Belum' : '未缴'));
 
             // 建立订单日期（优先使用 custom_order_date，否则用 created_at）
-            var orderStartDate = order.custom_order_date
+            let orderStartDate = order.custom_order_date
                 ? Utils.formatDate(order.custom_order_date)
                 : (order.created_at ? Utils.formatDate(order.created_at) : '-');
 
             // 到期日：订单起始日 + 还款期数（月）
-            var maturityDateStr = '-';
+            let maturityDateStr = '-';
             if (order.repayment_type === 'fixed' && order.repayment_term) {
-                var startRaw = order.custom_order_date || order.created_at;
+                let startRaw = order.custom_order_date || order.created_at;
                 if (startRaw) {
-                    var matDate = new Date(startRaw);
+                    let matDate = new Date(startRaw);
                     matDate.setMonth(matDate.getMonth() + (order.repayment_term || 0));
                     maturityDateStr = Utils.formatDate(matDate.toISOString().substring(0, 10));
                 }
             }
 
-            var repaymentInfoHtml = ''; // 将在 interestCount 计算完后赋值
+            let repaymentInfoHtml = ''; // 将在 interestCount 计算完后赋值
             // 分离利息和本金表格展示，便于阅读
-            var interestRows = '', principalRows = '';
-            var interestCount = 0, principalCount = 0;
+            let interestRows = '', principalRows = '';
+            let interestCount = 0, principalCount = 0;
             for (var j = 0; j < (payments || []).length; j++) {
-                var pj = payments[j];
+                let pj = payments[j];
                 if (pj.type === 'interest') {
                     interestCount++;
-                    var methodClassInt = pj.payment_method === 'cash' ? 'cash' : 'bank';
+                    let methodClassInt = pj.payment_method === 'cash' ? 'cash' : 'bank';
                     interestRows += '<tr>' +
                         '<td class="text-center">' + interestCount + '</td>' +
                         '<td class="date-cell">' + Utils.formatDate(pj.date) + '</td>' +
@@ -920,7 +920,7 @@
                         '</tr>';
                 } else if (pj.type === 'principal') {
                     principalCount++;
-                    var methodClassPr = pj.payment_method === 'cash' ? 'cash' : 'bank';
+                    let methodClassPr = pj.payment_method === 'cash' ? 'cash' : 'bank';
                     principalRows += '<tr>' +
                         '<td class="date-cell">' + Utils.formatDate(pj.date) + '</td>' +
                         '<td class="amount">' + Utils.formatCurrency(pj.amount) + '</td>' +
@@ -933,10 +933,10 @@
 
             // 修复：repaymentInfoHtml 在 interestCount 确定后构建，确保「已还次数」与「还款记录」一致
             if (order.repayment_type === 'fixed') {
-                var totalMonths = order.repayment_term || 0;
-                var fixedPayment = order.monthly_fixed_payment || 0;
-                var paidCount = interestCount;                          // 以实际还款记录数为准
-                var remainingCount = Math.max(0, totalMonths - paidCount);
+                let totalMonths = order.repayment_term || 0;
+                let fixedPayment = order.monthly_fixed_payment || 0;
+                let paidCount = interestCount;                          // 以实际还款记录数为准
+                let remainingCount = Math.max(0, totalMonths - paidCount);
                 repaymentInfoHtml =
                     '<p><strong>' + t('repayment_type') + ':</strong> 📅 ' + t('fixed_repayment') + ' (' + totalMonths + ' ' + (lang === 'id' ? 'kali' : '次') + ')</p>' +
                     '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>' +
@@ -953,7 +953,7 @@
                     '<p><strong>' + (lang === 'id' ? 'Tanggal Mulai' : '建立订单日期') + ':</strong> ' + orderStartDate + '</p>';
             }
 
-            var content = '' +
+            let content = '' +
                 '<div class="page-header">' +
                 '<h2>📄 ' + t('order_details') + '</h2>' +
                 '<div class="header-actions">' +
@@ -1036,8 +1036,8 @@
         window.APP.showPaymentHistory = OrdersPage.showPaymentHistory.bind(OrdersPage);
         window.APP.printAllOrders = OrdersPage.printAllOrders.bind(OrdersPage);
         window.APP.repairOrderFees = async function(orderId) {
-            var lang = Utils.lang;
-            var confirmed = await Utils.toast.confirm(lang === 'id'
+            let lang = Utils.lang;
+            let confirmed = await Utils.toast.confirm(lang === 'id'
                 ? '🔧 Perbaiki Catatan Biaya\n\nIni akan menghapus dan menyinkronkan ulang catatan biaya admin/layanan di pesanan ' + orderId + ' sesuai nilai yang tersimpan di pesanan.\n\nLanjutkan?'
                 : '🔧 修复费用流水\n\n将清理并重新同步订单 ' + orderId + ' 的管理费/服务费缴费记录，使其与订单中保存的金额保持一致。\n\n确认执行？');
             if (!confirmed) return;
@@ -1066,7 +1066,7 @@
 
     // 添加逾期行样式
     if (!document.getElementById('orderOverdueStyle')) {
-        var style = document.createElement('style');
+        let style = document.createElement('style');
         style.id = 'orderOverdueStyle';
         style.textContent = '\n            .order-row--overdue { background-color: #fef2f2 !important; border-left: 3px solid #ef4444; }\n            .order-row--overdue:hover { background-color: #fee2e2 !important; }\n            .badge--overdue { background: #fee2e2; color: #dc2626; }\n            .order-row.row-selected { background-color: var(--primary-soft) !important; border-left: 3px solid var(--primary); }\n            .order-row--overdue.row-selected { background-color: #fde68a !important; border-left: 3px solid var(--warning); }\n        ';
         document.head.appendChild(style);
@@ -1077,24 +1077,24 @@
 (function() {
     if (!window.JF) window.JF = {};
 
-    var _editPayments = [];
-    var _nextTmpId = -1;
+    let _editPayments = [];
+    let _nextTmpId = -1;
 
-    var AdminEditOrder = {
+    let AdminEditOrder = {
 
         _renderPaymentEditor: function(lang) {
-            var interest  = _editPayments.filter(function(p){ return p.type === 'interest'  && !p._deleted; });
-            var principal = _editPayments.filter(function(p){ return p.type === 'principal' && !p._deleted; });
-            var methodOpts = '<option value="cash">' + (lang === 'id' ? 'Tunai' : '现金') + '</option>' +
+            let interest  = _editPayments.filter(function(p){ return p.type === 'interest'  && !p._deleted; });
+            let principal = _editPayments.filter(function(p){ return p.type === 'principal' && !p._deleted; });
+            let methodOpts = '<option value="cash">' + (lang === 'id' ? 'Tunai' : '现金') + '</option>' +
                              '<option value="bank">' + (lang === 'id' ? 'Bank' : '银行') + '</option>';
 
             function rowHtml(p) {
-                var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
-                var isInterest = p.type === 'interest';
-                var mthHtml = isInterest
+                let mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
+                let isInterest = p.type === 'interest';
+                let mthHtml = isInterest
                     ? '<input type="number" id="' + mid + '_months" value="' + (p.months || 1) + '" min="1" max="12" step="1" style="width:60px;padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;" title="' + (lang === 'id' ? 'Periode' : '期数') + '">'
                     : '<span style="color:var(--text-muted);font-size:12px;">—</span>';
-                var methodSel = '<select id="' + mid + '_method" style="padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;">' +
+                let methodSel = '<select id="' + mid + '_method" style="padding:5px 6px;border-radius:5px;border:1px solid var(--border-light);font-size:13px;">' +
                     methodOpts.replace('value="' + p.payment_method + '"', 'value="' + p.payment_method + '" selected') +
                     '</select>';
                 return '<tr id="' + mid + '_row" style="border-bottom:1px solid var(--border-light);">' +
@@ -1109,13 +1109,13 @@
                     '</tr>';
             }
 
-            var iRows = interest.length ? interest.map(rowHtml).join('') :
+            let iRows = interest.length ? interest.map(rowHtml).join('') :
                 '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? 'Belum ada catatan' : '暂无记录') + '</td></tr>';
-            var pRows = principal.length ? principal.map(rowHtml).join('') :
+            let pRows = principal.length ? principal.map(rowHtml).join('') :
                 '<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px;">' + (lang === 'id' ? 'Belum ada catatan' : '暂无记录') + '</td></tr>';
 
-            var thStyle = 'style="padding:7px 8px;background:var(--bg-hover);font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;"';
-            var tableHead = '<thead><tr>' +
+            let thStyle = 'style="padding:7px 8px;background:var(--bg-hover);font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;"';
+            let tableHead = '<thead><tr>' +
                 '<th ' + thStyle + '>' + (lang === 'id' ? 'Tanggal' : '日期') + '</th>' +
                 '<th ' + thStyle + '>' + (lang === 'id' ? 'Jumlah (Rp)' : '金额 (Rp)') + '</th>' +
                 '<th ' + thStyle + '>' + (lang === 'id' ? 'Periode' : '期数') + '</th>' +
@@ -1124,7 +1124,7 @@
                 '<th ' + thStyle + '>' + (lang === 'id' ? 'Aksi' : '操作') + '</th>' +
                 '</tr></thead>';
 
-            var today = Utils.getLocalToday();
+            let today = Utils.getLocalToday();
 
             return '<div class="form-section" id="payment_editor_section">' +
                 '<div class="form-section-title"><span class="section-icon">💰</span> ' + (lang === 'id' ? 'Catatan Pembayaran Bunga (edit per baris)' : '利息缴纳记录（逐条编辑）') + '</div>' +
@@ -1143,54 +1143,54 @@
         },
 
         _deletePaymentRow: function(pid) {
-            var p = _editPayments.find(function(x){ return x.id === pid; });
+            let p = _editPayments.find(function(x){ return x.id === pid; });
             if (!p) return;
             p._deleted = true;
-            var mid = 'pm_' + (pid < 0 ? 'new' + Math.abs(pid) : pid);
-            var row = document.getElementById(mid + '_row');
+            let mid = 'pm_' + (pid < 0 ? 'new' + Math.abs(pid) : pid);
+            let row = document.getElementById(mid + '_row');
             if (row) row.style.display = 'none';
         },
 
         _addPaymentRow: function(type) {
-            var lang = Utils.lang;
-            var today = Utils.getLocalToday();
-            var newRec = { id: _nextTmpId--, type: type, date: today, amount: 0, payment_method: 'cash', months: 1, description: '', _new: true };
+            let lang = Utils.lang;
+            let today = Utils.getLocalToday();
+            let newRec = { id: _nextTmpId--, type: type, date: today, amount: 0, payment_method: 'cash', months: 1, description: '', _new: true };
             _editPayments.push(newRec);
-            var tbody = document.getElementById(type === 'interest' ? 'interest_rows' : 'principal_rows');
+            let tbody = document.getElementById(type === 'interest' ? 'interest_rows' : 'principal_rows');
             if (!tbody) return;
-            var emptyRow = tbody.querySelector('td[colspan]');
+            let emptyRow = tbody.querySelector('td[colspan]');
             if (emptyRow) emptyRow.closest('tr').remove();
-            var sec = document.getElementById('payment_editor_section');
+            let sec = document.getElementById('payment_editor_section');
             if (sec) sec.outerHTML = AdminEditOrder._renderPaymentEditor(lang);
             AdminEditOrder._bindPaymentAmountInputs();
         },
 
         _bindPaymentAmountInputs: function() {
             _editPayments.filter(function(p){ return !p._deleted; }).forEach(function(p) {
-                var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
-                var el = document.getElementById(mid + '_amount');
+                let mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
+                let el = document.getElementById(mid + '_amount');
                 if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
             });
         },
 
         _collectPaymentEdits: function() {
-            var toDelete = [], toUpdate = [], toAdd = [];
+            let toDelete = [], toUpdate = [], toAdd = [];
             _editPayments.forEach(function(p) {
-                var mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
+                let mid = 'pm_' + (p.id < 0 ? 'new' + Math.abs(p.id) : p.id);
                 if (p._deleted) {
                     if (!p._new) toDelete.push(p.id);
                     return;
                 }
-                var dateEl   = document.getElementById(mid + '_date');
-                var amtEl    = document.getElementById(mid + '_amount');
-                var mthEl    = document.getElementById(mid + '_months');
-                var methEl   = document.getElementById(mid + '_method');
-                var descEl   = document.getElementById(mid + '_desc');
-                var date   = dateEl   ? dateEl.value   : p.date;
-                var amount = amtEl    ? (Utils.parseNumberFromCommas(amtEl.value) || 0) : p.amount;
-                var months = mthEl    ? (parseInt(mthEl.value) || 1) : p.months;
-                var method = methEl   ? methEl.value   : p.payment_method;
-                var desc   = descEl   ? descEl.value.trim() : p.description;
+                let dateEl   = document.getElementById(mid + '_date');
+                let amtEl    = document.getElementById(mid + '_amount');
+                let mthEl    = document.getElementById(mid + '_months');
+                let methEl   = document.getElementById(mid + '_method');
+                let descEl   = document.getElementById(mid + '_desc');
+                let date   = dateEl   ? dateEl.value   : p.date;
+                let amount = amtEl    ? (Utils.parseNumberFromCommas(amtEl.value) || 0) : p.amount;
+                let months = mthEl    ? (parseInt(mthEl.value) || 1) : p.months;
+                let method = methEl   ? methEl.value   : p.payment_method;
+                let desc   = descEl   ? descEl.value.trim() : p.description;
 
                 if (p._new) {
                     toAdd.push({ type: p.type, date: date, amount: amount, payment_method: method, months: months, description: desc });
@@ -1206,14 +1206,14 @@
                 Utils.toast.error(Utils.lang === 'id' ? 'Hanya admin yang dapat mengedit pesanan' : '仅管理员可修改订单');
                 return;
             }
-            var lang = Utils.lang;
-            var t = Utils.t.bind(Utils);
+            let lang = Utils.lang;
+            let t = Utils.t.bind(Utils);
             try {
-                var order = await SUPABASE.getOrder(orderId);
+                let order = await SUPABASE.getOrder(orderId);
                 if (!order) throw new Error('订单不存在');
                 await SUPABASE.unlockOrder(orderId);
 
-                var histResult = await SUPABASE.getPaymentHistory(orderId);
+                let histResult = await SUPABASE.getPaymentHistory(orderId);
                 _editPayments = (histResult.payments || [])
                     .filter(function(p){ return p.type === 'interest' || p.type === 'principal'; })
                     .map(function(p){ return {
@@ -1227,11 +1227,11 @@
                     }; });
                 _nextTmpId = -1;
 
-                var today = Utils.getLocalToday();
-                var orderDateStr = order.custom_order_date || (order.created_at || '').substring(0, 10) || today;
-                var remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
+                let today = Utils.getLocalToday();
+                let orderDateStr = order.custom_order_date || (order.created_at || '').substring(0, 10) || today;
+                let remainingPrincipal = (order.loan_amount || 0) - (order.principal_paid || 0);
 
-                var paymentEditorHtml = this._renderPaymentEditor(lang);
+                let paymentEditorHtml = this._renderPaymentEditor(lang);
 
                 document.getElementById('app').innerHTML =
                     '<div class="page-header">' +
@@ -1326,7 +1326,7 @@
                     '</div></div>';
 
                 ['edit_loan_amount', 'edit_admin_fee', 'edit_service_fee', 'edit_monthly_payment'].forEach(function(id) {
-                    var el = document.getElementById(id);
+                    let el = document.getElementById(id);
                     if (el && Utils.bindAmountFormat) Utils.bindAmountFormat(el);
                 });
                 this._bindPaymentAmountInputs();
@@ -1342,28 +1342,28 @@
                 Utils.toast.error(Utils.lang === 'id' ? 'Hanya admin yang dapat menyimpan perubahan' : '仅管理员可保存修改');
                 return;
             }
-            var lang = Utils.lang;
-            var saveBtn = document.getElementById('adminSaveBtn');
+            let lang = Utils.lang;
+            let saveBtn = document.getElementById('adminSaveBtn');
             if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ ' + (lang === 'id' ? 'Menyimpan...' : '保存中...'); }
             try {
-                var loanAmount   = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount') ? document.getElementById('edit_loan_amount').value : null) || 0;
-                var adminFee     = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee') ? document.getElementById('edit_admin_fee').value : null) || 0;
-                var serviceFee   = Utils.parseNumberFromCommas(document.getElementById('edit_service_fee') ? document.getElementById('edit_service_fee').value : null) || 0;
-                var servicePct   = parseFloat(document.getElementById('edit_service_fee_percent') ? document.getElementById('edit_service_fee_percent').value : 0) || 0;
-                var interestRate = parseFloat(document.getElementById('edit_interest_rate') ? document.getElementById('edit_interest_rate').value : 0) || 10;
-                var repayType    = document.getElementById('edit_repayment_type') ? document.getElementById('edit_repayment_type').value : 'flexible';
-                var repayTerm    = parseInt(document.getElementById('edit_repayment_term') ? document.getElementById('edit_repayment_term').value : 0) || null;
-                var monthlyPmt   = Utils.parseNumberFromCommas(document.getElementById('edit_monthly_payment') ? document.getElementById('edit_monthly_payment').value : null) || 0;
-                var pawnTerm     = parseInt(document.getElementById('edit_pawn_term') ? document.getElementById('edit_pawn_term').value : 0) || null;
-                var maxExtension = parseInt(document.getElementById('edit_max_extension') ? document.getElementById('edit_max_extension').value : 0) || 10;
-                var adminFeePaid = (document.getElementById('edit_admin_fee_paid') ? document.getElementById('edit_admin_fee_paid').value : 'false') === 'true';
-                var orderDate    = document.getElementById('edit_order_date') ? (document.getElementById('edit_order_date').value || Utils.getLocalToday()) : Utils.getLocalToday();
-                var collateral   = document.getElementById('edit_collateral') ? document.getElementById('edit_collateral').value.trim() : '';
-                var custName     = document.getElementById('edit_customer_name') ? document.getElementById('edit_customer_name').value.trim() : '';
-                var custKtp      = document.getElementById('edit_customer_ktp') ? document.getElementById('edit_customer_ktp').value.trim() : '';
-                var custPhone    = document.getElementById('edit_customer_phone') ? document.getElementById('edit_customer_phone').value.trim() : '';
-                var custAddress  = document.getElementById('edit_customer_address') ? document.getElementById('edit_customer_address').value.trim() : '';
-                var notes        = document.getElementById('edit_notes') ? document.getElementById('edit_notes').value.trim() : '';
+                let loanAmount   = Utils.parseNumberFromCommas(document.getElementById('edit_loan_amount') ? document.getElementById('edit_loan_amount').value : null) || 0;
+                let adminFee     = Utils.parseNumberFromCommas(document.getElementById('edit_admin_fee') ? document.getElementById('edit_admin_fee').value : null) || 0;
+                let serviceFee   = Utils.parseNumberFromCommas(document.getElementById('edit_service_fee') ? document.getElementById('edit_service_fee').value : null) || 0;
+                let servicePct   = parseFloat(document.getElementById('edit_service_fee_percent') ? document.getElementById('edit_service_fee_percent').value : 0) || 0;
+                let interestRate = parseFloat(document.getElementById('edit_interest_rate') ? document.getElementById('edit_interest_rate').value : 0) || 10;
+                let repayType    = document.getElementById('edit_repayment_type') ? document.getElementById('edit_repayment_type').value : 'flexible';
+                let repayTerm    = parseInt(document.getElementById('edit_repayment_term') ? document.getElementById('edit_repayment_term').value : 0) || null;
+                let monthlyPmt   = Utils.parseNumberFromCommas(document.getElementById('edit_monthly_payment') ? document.getElementById('edit_monthly_payment').value : null) || 0;
+                let pawnTerm     = parseInt(document.getElementById('edit_pawn_term') ? document.getElementById('edit_pawn_term').value : 0) || null;
+                let maxExtension = parseInt(document.getElementById('edit_max_extension') ? document.getElementById('edit_max_extension').value : 0) || 10;
+                let adminFeePaid = (document.getElementById('edit_admin_fee_paid') ? document.getElementById('edit_admin_fee_paid').value : 'false') === 'true';
+                let orderDate    = document.getElementById('edit_order_date') ? (document.getElementById('edit_order_date').value || Utils.getLocalToday()) : Utils.getLocalToday();
+                let collateral   = document.getElementById('edit_collateral') ? document.getElementById('edit_collateral').value.trim() : '';
+                let custName     = document.getElementById('edit_customer_name') ? document.getElementById('edit_customer_name').value.trim() : '';
+                let custKtp      = document.getElementById('edit_customer_ktp') ? document.getElementById('edit_customer_ktp').value.trim() : '';
+                let custPhone    = document.getElementById('edit_customer_phone') ? document.getElementById('edit_customer_phone').value.trim() : '';
+                let custAddress  = document.getElementById('edit_customer_address') ? document.getElementById('edit_customer_address').value.trim() : '';
+                let notes        = document.getElementById('edit_notes') ? document.getElementById('edit_notes').value.trim() : '';
 
                 if (!collateral || loanAmount <= 0) {
                     Utils.toast.warning(lang === 'id' ? 'Nama jaminan dan jumlah pinjaman tidak boleh kosong' : '抵押物和贷款金额不能为空');
@@ -1371,18 +1371,18 @@
                     return;
                 }
 
-                var payEdits = this._collectPaymentEdits();
-                var allRecs = payEdits.toUpdate.concat(payEdits.toAdd);
+                let payEdits = this._collectPaymentEdits();
+                let allRecs = payEdits.toUpdate.concat(payEdits.toAdd);
                 for (var ri = 0; ri < allRecs.length; ri++) {
-                    var rec = allRecs[ri];
+                    let rec = allRecs[ri];
                     if (!rec.date) { Utils.toast.warning(lang === 'id' ? 'Tanggal catatan pembayaran tidak boleh kosong' : '缴费记录日期不能为空'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); } return; }
                     if (!rec.amount || rec.amount <= 0) { Utils.toast.warning(lang === 'id' ? 'Jumlah catatan pembayaran harus lebih dari 0' : '缴费记录金额必须大于0'); if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 ' + (lang === 'id' ? 'Simpan & Kunci Kembali' : '保存并重新锁定'); } return; }
                 }
 
-                var order = await SUPABASE.getOrder(orderId);
-                var agreedRate = interestRate / 100;
+                let order = await SUPABASE.getOrder(orderId);
+                let agreedRate = interestRate / 100;
 
-                var updates = {
+                let updates = {
                     collateral_name: collateral, loan_amount: loanAmount,
                     admin_fee: adminFee, admin_fee_paid: adminFeePaid && adminFee > 0,
                     service_fee_amount: serviceFee, service_fee_percent: servicePct,
@@ -1404,8 +1404,8 @@
                 } else if (repayType !== 'flexible') {
                     updates.pawn_due_date = null;
                 }
-                var client = SUPABASE.getClient();
-                var res = await client.from('orders').update(updates).eq('order_id', orderId);
+                let client = SUPABASE.getClient();
+                let res = await client.from('orders').update(updates).eq('order_id', orderId);
                 if (res.error) throw res.error;
 
                 await SUPABASE.syncFeesAfterAdminEdit(orderId, adminFee, adminFeePaid && adminFee > 0, serviceFee, orderDate);
@@ -1413,7 +1413,7 @@
                 // next_interest_due_date 和 overdue_days（否则仪表盘逾期状态不会立即更新）
                 await SUPABASE.adminSyncPaymentRecords(orderId, payEdits, orderDate);
                 // BUG修复：保存后立即重跑逾期计算，不等定时器（每18分钟才触发一次）
-                try { await SUPABASE.updateOverdueDays(); } catch(e) { console.warn('[adminSaveOrder] updateOverdueDays 失败:', e.message); }
+                try { await SUPABASE.updateOverdueDays(); } catch(e) { debugLog('[WARN]','[adminSaveOrder] updateOverdueDays 失败:', e.message); }
                 await SUPABASE.relockOrder(orderId);
 
                 Utils.toast.success(lang === 'id' ? '✅ Pesanan berhasil diubah dan dikunci kembali!' : '✅ 订单已修改并重新锁定！');

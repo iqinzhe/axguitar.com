@@ -102,7 +102,7 @@
         // [中危-2 修复] 对敏感操作打印警告，提示调用方改用 canAsync()
         can(action) {
             if (SENSITIVE_ACTIONS.has(action)) {
-                console.warn(
+                debugLog('[WARN]',
                     `[Permission] "${action}" 是敏感操作，同步检查的角色来自内存缓存，` +
                     '可能已过期。请改用 canAsync() 进行实时验证。'
                 );
@@ -130,7 +130,7 @@
                 if (!userStoreId) return false;
                 return storeId === userStoreId;
             } catch (error) {
-                console.warn('[Permission] checkStoreAccess 异常:', error);
+                debugLog('[WARN]','[Permission] checkStoreAccess 异常:', error);
                 return false;
             }
         },
@@ -153,7 +153,7 @@
             if (this.isAdmin() || this.isStoreManager()) return true;
             if (this.isStaff()) {
                 if (amount > this.STAFF_EXPENSE_MAX_AMOUNT) {
-                    console.warn(`[Permission] 员工支出金额 ${Utils.formatCurrency(amount)} 超过限额 ${Utils.formatCurrency(this.STAFF_EXPENSE_MAX_AMOUNT)}`);
+                    debugLog('[WARN]',`[Permission] 员工支出金额 ${Utils.formatCurrency(amount)} 超过限额 ${Utils.formatCurrency(this.STAFF_EXPENSE_MAX_AMOUNT)}`);
                     return false;
                 }
                 return true;
@@ -168,7 +168,7 @@
             if (role === 'admin' || role === 'store_manager') return true;
             if (role === 'staff') {
                 if (amount > this.STAFF_EXPENSE_MAX_AMOUNT) {
-                    console.warn(`[Permission] 员工支出金额 ${Utils.formatCurrency(amount)} 超过限额 ${Utils.formatCurrency(this.STAFF_EXPENSE_MAX_AMOUNT)}`);
+                    debugLog('[WARN]',`[Permission] 员工支出金额 ${Utils.formatCurrency(amount)} 超过限额 ${Utils.formatCurrency(this.STAFF_EXPENSE_MAX_AMOUNT)}`);
                     return false;
                 }
                 return true;

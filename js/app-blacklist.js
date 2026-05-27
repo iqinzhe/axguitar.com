@@ -180,18 +180,18 @@
                     '</div>';
 
                 // [分页] 黑名单前端分页
-                var _blItems = blacklist;
-                var _blIsAdmin = isAdmin;
-                var _blLang = lang;
+                let _blItems = blacklist;
+                let _blIsAdmin = isAdmin;
+                let _blLang = lang;
                 setTimeout(function() {
                     if (window.JF && JF.Pagination && _blItems) {
                         JF.Pagination.render('blacklistTableBody', _blItems, 1, 15, function(item) {
-                            var iname = Utils.escapeHtml(item.customer_name || '-');
-                            var reason = Utils.escapeHtml(item.reason || '-');
-                            var addedDate = Utils.formatDate(item.added_at || item.created_at || '');
-                            var addedBy = Utils.escapeHtml(item.added_by_name || '-');
-                            var storeName = _blIsAdmin ? Utils.escapeHtml(item.store_name || item.store_id || '-') : '';
-                            var removeBtn = (_blIsAdmin || (window.PERMISSION && PERMISSION.isStoreManager()))
+                            let iname = Utils.escapeHtml(item.customer_name || '-');
+                            let reason = Utils.escapeHtml(item.reason || '-');
+                            let addedDate = Utils.formatDate(item.added_at || item.created_at || '');
+                            let addedBy = Utils.escapeHtml(item.added_by_name || '-');
+                            let storeName = _blIsAdmin ? Utils.escapeHtml(item.store_name || item.store_id || '-') : '';
+                            let removeBtn = (_blIsAdmin || (window.PERMISSION && PERMISSION.isStoreManager()))
                                 ? '<button onclick="APP.removeFromBlacklist(\'' + item.id + '\')" class="btn btn--danger btn--sm">🗑️ ' + (_blLang === 'id' ? 'Hapus' : '移除') + '</button>'
                                 : '';
                             return '<tr>' +

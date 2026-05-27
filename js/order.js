@@ -276,7 +276,7 @@
                 const { data: orderIdFlows, error: orderIdError } = await query;
                 
                 if (orderIdError) {
-                    console.warn('通过 order_id 查询现金流失败:', orderIdError.message);
+                    debugLog('[WARN]','通过 order_id 查询现金流失败:', orderIdError.message);
                 }
                 
                 const { data: refIdFlows, error: refIdError } = await client
@@ -287,7 +287,7 @@
                     .order('recorded_at', { ascending: false });
                 
                 if (refIdError) {
-                    console.warn('通过 reference_id 查询现金流失败:', refIdError.message);
+                    debugLog('[WARN]','通过 reference_id 查询现金流失败:', refIdError.message);
                 }
                 
                 const allFlows = [...(orderIdFlows || []), ...(refIdFlows || [])];

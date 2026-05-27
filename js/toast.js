@@ -272,7 +272,7 @@
                 confirmDialog(message, title, () => resolve(true), () => resolve(false));
             } else {
                 // 降级方案：静默失败，返回 false
-                console.warn('[Toast] confirmDialog 不可用，无法显示确认框');
+                debugLog('[WARN]','[Toast] confirmDialog 不可用，无法显示确认框');
                 resolve(false);
             }
         });

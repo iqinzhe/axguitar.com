@@ -3,6 +3,26 @@
 'use strict';
 
 (function () {
+/* ==================== 时间常量（毫秒） ====================
+   集中定义，避免魔法数字散落各文件。
+   其他文件通过 window.JF_TIME 访问，或直接使用 Utils 命名空间下的同名属性。 */
+const MS_MINUTE  = 60_000;          // 1分钟
+const MS_HOUR    = 3_600_000;       // 1小时
+const MS_DAY     = 86_400_000;      // 1天
+const MS_WEEK    = 604_800_000;     // 7天
+window.JF_TIME   = { MS_MINUTE, MS_HOUR, MS_DAY, MS_WEEK };
+
+/* ==================== 调试日志（生产环境可关闭） ====================
+   用法：JF_DEBUG = true 开启，false 关闭（默认关闭）
+   console.error 不受此开关影响，始终输出。 */
+window.JF_DEBUG = window.JF_DEBUG ?? false;
+function debugLog(...args) {
+    if (window.JF_DEBUG) console.log(...args);
+}
+window.debugLog = debugLog;
+
+
+
     const JF = window.JF || {};
     window.JF = JF;
 
@@ -630,7 +650,7 @@
             if (window.Toast && window.Toast.confirmPromise) {
                 return window.Toast.confirmPromise(msg, title);
             }
-            console.warn('Toast.confirmPromise 不可用，使用原生 confirm');
+            debugLog('[WARN]','Toast.confirmPromise 不可用，使用原生 confirm');
             return Promise.resolve(confirm(msg));
         },
     };
@@ -995,10 +1015,10 @@
                     this._isOnline = online;
                     if (online) {
                     } else {
-                        console.warn('[NetworkMonitor] 实际连通性: 离线');
+                        debugLog('[WARN]','[NetworkMonitor] 实际连通性: 离线');
                     }
                 }
-            }, 60000);
+            }, MS_MINUTE);
         },
         
         async _checkRealConnectivity() {
