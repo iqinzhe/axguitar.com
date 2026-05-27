@@ -1,9 +1,7 @@
 // supabase.js - v2.0 (客户ID重用 + 原有全部功能 + 变卖后禁止缴费 + 费用缴纳检查 + 逾期时区修复 + 流水日期与订单一致)
-// 修复1：recordPrincipalPayment / recordFixedPayment / earlySettleFixedOrder / recordInterestPayment 超额抵扣
-//        中 payment_history.date 和 cash_flow_records.flow_date 统一改用订单创建日期，不再使用 todayStr()
-// 修复2：updateOrder 修改 loan_amount 时，同步更新 cash_flow_records 中对应的 loan_disbursement 流水金额
-// 修复3：adminSyncPaymentRecords（管理员保存订单）同样同步 loan_disbursement 流水金额
-//        确保管理员编辑订单金额后，资金流水、保险柜支出、在押资金、可动用资金全部与订单一致
+// updateOrder 修改 loan_amount 时，同步更新 cash_flow_records 中对应的 loan_disbursement 流水金额
+// adminSyncPaymentRecords（管理员保存订单）同样同步 loan_disbursement 流水金额
+// 确保管理员编辑订单金额后，资金流水、保险柜支出、在押资金、可动用资金全部与订单一致
 
 'use strict';
 
