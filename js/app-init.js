@@ -1,4 +1,4 @@
-/* app-init.js — APP门面层、全局快捷键、应用启动（从 index.html 内联块提取） */
+/* app-init.js — APP门面层、全局快捷键、应用启动 */
 (function () {
     'use strict';
 
