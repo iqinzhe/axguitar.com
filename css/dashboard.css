@@ -294,7 +294,7 @@
   .cal-table { width: 100%; text-align: center; border-collapse: separate; border-spacing: 2px; }
   .cal-table th { padding: 2px 0; font-weight: 600; color: var(--text-secondary); font-size: 10px; }
   .cal-table td { padding: 0; border: none; }
-  .cal-cell { position: relative; border-radius: 5px; transition: background 0.15s; cursor: default; padding: 2px 2px 10px; min-height: 36px; }
+  .cal-cell { position: relative; border-radius: 5px; transition: background 0.15s; cursor: default; padding: 2px 3px 8px; min-height: 28px; display: flex; align-items: flex-start; justify-content: space-between; }
   .cal-cell.has-due { cursor: pointer; }
   .cal-cell.has-due:active { filter: brightness(0.95); }
   .cal-cell.has-due:hover { filter: brightness(0.9); }
@@ -302,15 +302,14 @@
   .cal-cell.is-today { outline: 2px solid var(--primary); outline-offset: -1px; border-radius: 5px; }
   .cal-cell.cal-rest { background: rgba(22,163,74,0.08); }  /* 未来无业务=浅绿 */
 
-  .cal-date { display: block; font-size: 11px; color: var(--text-primary); line-height: 1.4; }
+  .cal-date { font-size: 11px; color: var(--text-primary); line-height: 1.4; flex-shrink: 0; }
   .cal-today { font-weight: 700; color: var(--primary) !important; }
 
   /* 方案C：热力色条 + 右上角总数 */
-  /* 总数角标 */
+  /* 总数角标 — 右侧与日期同行 */
   .cal-heat-num {
-    position: absolute; top: 3px; right: 4px;
-    font-size: 9px; font-weight: 700; line-height: 1;
-    color: #475569; cursor: pointer;
+    font-size: 9px; font-weight: 700; line-height: 1.4;
+    color: #475569; cursor: pointer; flex-shrink: 0;
   }
   .cal-heat-num--overdue { color: #b91c1c; }
 
