@@ -294,8 +294,9 @@
   .cal-table { width: 100%; text-align: center; border-collapse: separate; border-spacing: 2px; }
   .cal-table th { padding: 2px 0; font-weight: 600; color: var(--text-secondary); font-size: 10px; }
   .cal-table td { padding: 0; border: none; }
-  .cal-cell { position: relative; border-radius: 5px; transition: background 0.15s; cursor: default; padding: 1px 0; }
+  .cal-cell { position: relative; border-radius: 5px; transition: background 0.15s; cursor: default; padding: 2px 2px 10px; min-height: 36px; }
   .cal-cell.has-due { cursor: pointer; }
+  .cal-cell.has-due:active { filter: brightness(0.95); }
   .cal-cell.has-due:hover { filter: brightness(0.9); }
   .cal-empty { background: none !important; }
   .cal-cell.is-today { outline: 2px solid var(--primary); outline-offset: -1px; border-radius: 5px; }
@@ -304,21 +305,43 @@
   .cal-date { display: block; font-size: 11px; color: var(--text-primary); line-height: 1.4; }
   .cal-today { font-weight: 700; color: var(--primary) !important; }
 
-  /* 双色徽章 */
-  .cal-badge {
-    display: inline-block; border-radius: 8px; padding: 0 3px;
-    font-size: 9px; font-weight: 600; line-height: 1.5;
-    cursor: pointer; margin: 0 1px;
+  /* 方案C：热力色条 + 右上角总数 */
+  /* 总数角标 */
+  .cal-heat-num {
+    position: absolute; top: 3px; right: 4px;
+    font-size: 9px; font-weight: 700; line-height: 1;
+    color: #475569; cursor: pointer;
   }
-  .cal-badge--due { background: #fee2e2; color: #b91c1c; }
-  .cal-badge--due.cal-overdue { background: #991b1b; color: #fff; }
-  /* 本金到期徽章：橙色系，与利息到期红色系区分 */
-  .cal-badge--pawn { background: #ffedd5; color: #c2410c; }
-  .cal-badge--pawn.cal-overdue-pawn { background: #9a3412; color: #fff; }
-  .cal-badge--new { background: #dbeafe; color: #1d4ed8; }
-  .cal-badge--due:hover { background: #fca5a5; }
-  .cal-badge--pawn:hover { background: #fed7aa; }
-  .cal-badge--new:hover { background: #bfdbfe; }
+  .cal-heat-num--overdue { color: #b91c1c; }
+
+  /* 底部热力色条容器 */
+  .cal-heat-bar {
+    display: flex; position: absolute; bottom: 3px;
+    left: 3px; right: 3px; height: 4px;
+    border-radius: 2px; overflow: hidden; cursor: pointer;
+    gap: 1px;
+  }
+
+  /* 各类型色段 */
+  .cal-heat-seg {
+    height: 100%; border-radius: 2px; cursor: pointer;
+  }
+  .cal-heat-seg--due  { background: #EF9F27; }
+  .cal-heat-seg--due.cal-heat-seg--overdue { background: #b91c1c; }
+  .cal-heat-seg--pawn { background: #378ADD; }
+  .cal-heat-seg--new  { background: #639922; }
+
+  /* 图例色点 */
+  .cal-legend-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 3px; vertical-align: middle;
+  }
+  .cal-legend-dot--due  { background: #EF9F27; }
+  .cal-legend-dot--pawn { background: #378ADD; }
+  .cal-legend-dot--new  { background: #639922; }
+
+  /* 忙碌格子背景加深 */
+  .cal-cell.has-due { background: rgba(55,138,221,0.06); }
 
   /* 可休息标记 */
   .cal-rest-dot { display: block; font-size: 6px; color: #16a34a; line-height: 1; margin-top: 1px; }
