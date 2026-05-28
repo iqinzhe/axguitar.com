@@ -125,19 +125,17 @@
 
                 let cellContent = `<span class="cal-date${isToday ? ' cal-today' : ''}">${day}</span>`;
 
-                if (dueCount > 0) {
-                    const cls = isPast ? 'cal-badge cal-badge--due cal-overdue' : 'cal-badge cal-badge--due';
-                    cellContent += `<span class="${cls}" data-date="${dateStr}" data-type="due" title="${lang==='id'?'Jatuh tempo bunga':'利息到期'}: ${dueCount}">💰${dueCount}</span>`;
-                }
-                if (pawnCount > 0) {
-                    // 本金到期徽章：合同期满须还本金，用不同颜色区分
-                    const pawnCls = isPast ? 'cal-badge cal-badge--pawn cal-overdue-pawn' : 'cal-badge cal-badge--pawn';
-                    cellContent += `<span class="${pawnCls}" data-date="${dateStr}" data-type="pawn" title="${lang==='id'?'Jatuh tempo pokok':'本金到期'}: ${pawnCount}">🏦${pawnCount}</span>`;
-                }
-                if (newCount > 0) {
-                    cellContent += `<span class="cal-badge cal-badge--new" data-date="${dateStr}" data-type="new" title="${lang==='id'?'Baru':'新签'}: ${newCount}">🆕${newCount}</span>`;
-                }
-                if (isRestDay && !isPast) {
+                if (total > 0) {
+                    // 方案C：热力色条 + 右上角总数角标，点击格子展开明细
+                    const overdueFlag = isPast && (dueCount > 0 || pawnCount > 0);
+                    const totalCls = overdueFlag ? 'cal-heat-num cal-heat-num--overdue' : 'cal-heat-num';
+                    cellContent += `<span class="${totalCls}" data-date="${dateStr}" data-type="all">${total}</span>`;
+                    let heatSegs = '';
+                    if (dueCount  > 0) heatSegs += `<span class="cal-heat-seg cal-heat-seg--due${overdueFlag ? ' cal-heat-seg--overdue' : ''}"  style="flex:${dueCount}"  data-date="${dateStr}" data-type="all"></span>`;
+                    if (pawnCount > 0) heatSegs += `<span class="cal-heat-seg cal-heat-seg--pawn" style="flex:${pawnCount}" data-date="${dateStr}" data-type="all"></span>`;
+                    if (newCount  > 0) heatSegs += `<span class="cal-heat-seg cal-heat-seg--new"  style="flex:${newCount}"  data-date="${dateStr}" data-type="all"></span>`;
+                    cellContent += `<span class="cal-heat-bar" data-date="${dateStr}" data-type="all">${heatSegs}</span>`;
+                } else if (isRestDay && !isPast) {
                     cellContent += `<span class="cal-rest-dot" title="${lang==='id'?'Hari tenang':'可休息'}">●</span>`;
                 }
 
@@ -156,9 +154,9 @@
                 <div class="calendar-header">
                     <span>${month_str} ${year_str}</span>
                     <span class="cal-legend">
-                        <span class="cal-legend-item"><span class="cal-badge cal-badge--due">💰</span>${lang==='id'?'Bunga Jatuh Tempo':'利息到期'}</span>
-                        <span class="cal-legend-item"><span class="cal-badge cal-badge--pawn">🏦</span>${lang==='id'?'Pokok Jatuh Tempo':'本金到期'}</span>
-                        <span class="cal-legend-item"><span class="cal-badge cal-badge--new">🆕</span>${lang==='id'?'Order Baru':'新签订单'}</span>
+                        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--due"></span>${lang==='id'?'Bunga Jatuh Tempo':'利息到期'}</span>
+                        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--pawn"></span>${lang==='id'?'Pokok Jatuh Tempo':'本金到期'}</span>
+                        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--new"></span>${lang==='id'?'Order Baru':'新签订单'}</span>
                         <span class="cal-legend-item"><span class="cal-rest-dot">●</span>${lang==='id'?'Tenang':'可休息'}</span>
                     </span>
                 </div>
@@ -1037,8 +1035,8 @@
                 const dashMain = document.querySelector('.dash-main');
                 if (dashMain) {
                     dashMain.addEventListener('click', function(e) {
-                        const target = e.target.closest('.cal-badge');
-                        if (!target) return;
+                        const target = e.target.closest('[data-type="all"],[data-type="due"],[data-type="pawn"],[data-type="new"]');
+                        if (!target || !target.dataset.date) return;
                         e.stopPropagation();
                         const date = target.dataset.date;
                         const type = target.dataset.type; // 'due' or 'new'
@@ -1072,15 +1070,15 @@
 
                         let cardsHtml = '';
                         if (dueList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title">💰 ${lang==='id'?'Bunga Jatuh Tempo':'利息到期'} (${dueList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title"><span class='cal-legend-dot cal-legend-dot--due'></span> ${lang==='id'?'Bunga Jatuh Tempo':'利息到期'} (${dueList.length})</div>`;
                             dueList.forEach(o => cardsHtml += renderOrderCard(o, 'due'));
                         }
                         if (pawnList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title">🏦 ${lang==='id'?'Pokok Jatuh Tempo':'本金到期（合同期满）'} (${pawnList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title"><span class='cal-legend-dot cal-legend-dot--pawn'></span> ${lang==='id'?'Pokok Jatuh Tempo':'本金到期（合同期满）'} (${pawnList.length})</div>`;
                             pawnList.forEach(o => cardsHtml += renderOrderCard(o, 'pawn'));
                         }
                         if (newList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title">🆕 ${lang==='id'?'Order Baru':'新签订单'} (${newList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title"><span class='cal-legend-dot cal-legend-dot--new'></span> ${lang==='id'?'Order Baru':'新签订单'} (${newList.length})</div>`;
                             newList.forEach(o => cardsHtml += renderOrderCard(o, 'new'));
                         }
                         if (!cardsHtml) return;
@@ -1107,7 +1105,7 @@
                         setTimeout(() => {
                             const closeHandler = function(ev) {
                                 const p = document.getElementById('calPopup');
-                                if (p && !p.contains(ev.target) && !ev.target.closest('.cal-badge')) {
+                                if (p && !p.contains(ev.target) && !ev.target.closest('[data-type]')) {
                                     p.remove(); document.removeEventListener('click', closeHandler);
                                 }
                             };
