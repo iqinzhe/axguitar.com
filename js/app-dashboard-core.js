@@ -123,21 +123,25 @@
                 if (isRestDay && !isPast) cellCls += ' cal-rest';  // 未来无业务=浅绿
                 if (total > 0) cellCls += ' has-due';
 
-                let cellContent = `<span class="cal-date${isToday ? ' cal-today' : ''}">${day}</span>`;
-
+                // 方案C：内层 div 作定位容器，确保格子高度固定
+                // 日期左上，总数右上，热力色条固定在底部
+                let innerContent = '';
                 if (total > 0) {
-                    // 方案C：热力色条 + 右上角总数角标，点击格子展开明细
                     const overdueFlag = isPast && (dueCount > 0 || pawnCount > 0);
-                    const totalCls = overdueFlag ? 'cal-heat-num cal-heat-num--overdue' : 'cal-heat-num';
-                    cellContent += `<span class="${totalCls}" data-date="${dateStr}" data-type="all">${total}</span>`;
-                    let heatSegs = '';
-                    if (dueCount  > 0) heatSegs += `<span class="cal-heat-seg cal-heat-seg--due${overdueFlag ? ' cal-heat-seg--overdue' : ''}"  style="flex:${dueCount}"  data-date="${dateStr}" data-type="all"></span>`;
-                    if (pawnCount > 0) heatSegs += `<span class="cal-heat-seg cal-heat-seg--pawn" style="flex:${pawnCount}" data-date="${dateStr}" data-type="all"></span>`;
-                    if (newCount  > 0) heatSegs += `<span class="cal-heat-seg cal-heat-seg--new"  style="flex:${newCount}"  data-date="${dateStr}" data-type="all"></span>`;
-                    cellContent += `<span class="cal-heat-bar" data-date="${dateStr}" data-type="all">${heatSegs}</span>`;
+                    const numCls = overdueFlag ? 'cal-heat-num cal-heat-num--od' : 'cal-heat-num';
+                    let segs = '';
+                    if (dueCount  > 0) segs += `<i class="cal-hs cal-hs-due${overdueFlag?' cal-hs-od':''}" style="flex:${dueCount}"></i>`;
+                    if (pawnCount > 0) segs += `<i class="cal-hs cal-hs-pawn" style="flex:${pawnCount}"></i>`;
+                    if (newCount  > 0) segs += `<i class="cal-hs cal-hs-new"  style="flex:${newCount}"></i>`;
+                    innerContent = `<span class="${numCls}" data-date="${dateStr}" data-type="all">${total}</span>`
+                                 + `<span class="cal-heat-bar" data-date="${dateStr}" data-type="all">${segs}</span>`;
                 } else if (isRestDay && !isPast) {
-                    cellContent += `<span class="cal-rest-dot" title="${lang==='id'?'Hari tenang':'可休息'}">●</span>`;
+                    innerContent = `<span class="cal-rest-dot" title="${lang==='id'?'Hari tenang':'可休息'}">●</span>`;
                 }
+                const cellContent = `<div class="cal-inner" data-date="${total>0?dateStr:''}" data-type="${total>0?'all':''}">`
+                                  + `<span class="cal-date${isToday?' cal-today':''}">${day}</span>`
+                                  + innerContent
+                                  + `</div>`;
 
                 row += `<td class="${cellCls}"${bgStyle}>${cellContent}</td>`;
                 day++;
@@ -154,10 +158,10 @@
                 <div class="calendar-header">
                     <span>${month_str} ${year_str}</span>
                     <span class="cal-legend">
-                        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--due"></span>${lang==='id'?'Bunga Jatuh Tempo':'利息到期'}</span>
-                        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--pawn"></span>${lang==='id'?'Pokok Jatuh Tempo':'本金到期'}</span>
-                        <span class="cal-legend-item"><span class="cal-legend-dot cal-legend-dot--new"></span>${lang==='id'?'Order Baru':'新签订单'}</span>
-                        <span class="cal-legend-item"><span class="cal-rest-dot">●</span>${lang==='id'?'Tenang':'可休息'}</span>
+                        <span class="cal-legend-item"><i class="cal-ld cal-ld-due"></i>${lang==='id'?'Bunga Jatuh Tempo':'利息到期'}</span>
+                        <span class="cal-legend-item"><i class="cal-ld cal-ld-pawn"></i>${lang==='id'?'Pokok Jatuh Tempo':'本金到期'}</span>
+                        <span class="cal-legend-item"><i class="cal-ld cal-ld-new"></i>${lang==='id'?'Order Baru':'新签订单'}</span>
+                        <span class="cal-legend-item"><span class="cal-rest-dot" style="display:inline">●</span>${lang==='id'?'Tenang':'可休息'}</span>
                     </span>
                 </div>
                 <table class="cal-table">
@@ -1035,8 +1039,8 @@
                 const dashMain = document.querySelector('.dash-main');
                 if (dashMain) {
                     dashMain.addEventListener('click', function(e) {
-                        const target = e.target.closest('[data-type="all"],[data-type="due"],[data-type="pawn"],[data-type="new"]');
-                        if (!target || !target.dataset.date) return;
+                        const target = e.target.closest('.cal-inner[data-type="all"]');
+                        if (!target) return;
                         e.stopPropagation();
                         const date = target.dataset.date;
                         const type = target.dataset.type; // 'due' or 'new'
@@ -1070,15 +1074,15 @@
 
                         let cardsHtml = '';
                         if (dueList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title"><span class='cal-legend-dot cal-legend-dot--due'></span> ${lang==='id'?'Bunga Jatuh Tempo':'利息到期'} (${dueList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title">💰 ${lang==='id'?'Bunga Jatuh Tempo':'利息到期'} (${dueList.length})</div>`;
                             dueList.forEach(o => cardsHtml += renderOrderCard(o, 'due'));
                         }
                         if (pawnList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title"><span class='cal-legend-dot cal-legend-dot--pawn'></span> ${lang==='id'?'Pokok Jatuh Tempo':'本金到期（合同期满）'} (${pawnList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title">🏦 ${lang==='id'?'Pokok Jatuh Tempo':'本金到期（合同期满）'} (${pawnList.length})</div>`;
                             pawnList.forEach(o => cardsHtml += renderOrderCard(o, 'pawn'));
                         }
                         if (newList.length > 0) {
-                            cardsHtml += `<div class="cal-popup-section-title"><span class='cal-legend-dot cal-legend-dot--new'></span> ${lang==='id'?'Order Baru':'新签订单'} (${newList.length})</div>`;
+                            cardsHtml += `<div class="cal-popup-section-title">🆕 ${lang==='id'?'Order Baru':'新签订单'} (${newList.length})</div>`;
                             newList.forEach(o => cardsHtml += renderOrderCard(o, 'new'));
                         }
                         if (!cardsHtml) return;
@@ -1105,7 +1109,7 @@
                         setTimeout(() => {
                             const closeHandler = function(ev) {
                                 const p = document.getElementById('calPopup');
-                                if (p && !p.contains(ev.target) && !ev.target.closest('[data-type]')) {
+                                if (p && !p.contains(ev.target) && !ev.target.closest('.cal-inner')) {
                                     p.remove(); document.removeEventListener('click', closeHandler);
                                 }
                             };
