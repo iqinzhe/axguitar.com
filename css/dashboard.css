@@ -221,6 +221,17 @@
     min-height: 0;    /* 关键：grid 子元素必须设此值才能限制在格子内滚动 */
     height: 100%;     /* 撑满 grid 行 */
   }
+  /* 超宽屏防止内容无限拉伸，居中对齐 */
+  @media (min-width: 1600px) {
+    .dash-main {
+      padding: 16px clamp(16px, 3vw, 48px);
+    }
+    .dash-main > * {
+      max-width: 1500px;
+      width: 100%;
+      margin-inline: auto;
+    }
+  }
 
   /* 订单列表卡片：网页端不横向滚动，撑满宽度 */
   .order-table-card {
@@ -260,7 +271,7 @@
   .kpi-item { display: flex; flex-direction: column; gap: 2px; }
   .kpi-label { font-size: var(--font-xs); font-weight: 600; color: var(--gray-600); text-align: left; }
   .kpi-val {
-    font-size: 1.6rem;
+    font-size: clamp(1.6rem, 2vw, 2rem);
     font-weight: 700;
     font-family: var(--font-mono);
     letter-spacing: -0.02em;
@@ -322,49 +333,6 @@
 
   /* 可休息标记 */
   .cal-rest-dot { display: block; font-size: 6px; color: #16a34a; line-height: 1; margin-top: 1px; }
-
-  /* ── 方案C：热力色条 ── */
-  /* 内层容器：固定高度，相对定位，日期和色条都在里面 */
-  .cal-inner {
-    position: relative;
-    height: 36px;          /* 固定格子高度，永不撑格 */
-    display: block;
-    width: 100%;
-    cursor: default;
-  }
-  .cal-cell.has-due .cal-inner { cursor: pointer; }
-
-  /* 日期数字：左上角，与原始位置一致 */
-  .cal-inner .cal-date { position: absolute; top: 2px; left: 3px; }
-
-  /* 总数角标：右上角 */
-  .cal-heat-num {
-    position: absolute; top: 2px; right: 3px;
-    font-size: 9px; font-weight: 700; color: #64748b; line-height: 1.4;
-  }
-  .cal-heat-num--od { color: #b91c1c; }
-
-  /* 底部热力色条 */
-  .cal-heat-bar {
-    position: absolute; bottom: 3px; left: 2px; right: 2px;
-    height: 5px; display: flex; gap: 1px;
-    border-radius: 3px; overflow: hidden;
-  }
-  /* 各类型色段（用 <i> 标签，无语义干扰） */
-  .cal-hs { display: block; height: 100%; border-radius: 2px; }
-  .cal-hs-due  { background: #EF9F27; }
-  .cal-hs-due.cal-hs-od { background: #b91c1c; }
-  .cal-hs-pawn { background: #378ADD; }
-  .cal-hs-new  { background: #639922; }
-
-  /* 图例色点 */
-  .cal-ld {
-    display: inline-block; width: 8px; height: 8px;
-    border-radius: 50%; margin-right: 3px; vertical-align: middle;
-  }
-  .cal-ld-due  { background: #EF9F27; }
-  .cal-ld-pawn { background: #378ADD; }
-  .cal-ld-new  { background: #639922; }
 
   /* 弹出卡片 */
   .cal-popup {
@@ -631,6 +599,73 @@
 
     /* bottom-row 桌面隐藏 */
     .bottom-row { display: none !important; }
+  }
+
+  /* ── 大屏优化（15.6" 1440px+ / 19" 1440px+）── */
+  @media (min-width: 1440px) {
+    /* 侧边栏加宽，大屏导航更宽松 */
+    :root { --sidebar-width: 230px; }
+
+    /* 内容区加大内边距，呼吸感更好 */
+    .dash-main { padding: 16px 24px; gap: 14px; }
+
+    /* KPI 卡片内边距加大，字号更舒展 */
+    .kpi-card { padding: 18px 16px; }
+    .kpi-icon { font-size: 32px; }
+    .kpi-label { font-size: 0.72rem; }
+
+    /* mid-row 右列（收入构成）加宽 */
+    .mid-row { gap: 14px; }
+    .fund-flow-card  { grid-column: 1 / span 28; }
+    .income-card     { grid-column: 29 / span 16; grid-row: 1 / 3; }
+    .order-status-card   { grid-column: 1 / span 16; }
+    .message-center-card { grid-column: 17 / span 12; }
+
+    /* 资金统计数字加大 */
+    .fund-stat-val { font-size: 1.05rem; }
+    .fund-block-val { font-size: 1.05rem; }
+    .cb-val { font-size: 1.05rem; }
+    .np-val { font-size: 1.05rem; }
+
+    /* 辅助文字最低 11px，主内容 13px，避免大屏阅读疲劳 */
+    .fund-stat-label,
+    .fund-block-label,
+    .kpi-trend,
+    .cb-label,
+    .income-sub,
+    .legend-pct,
+    .cal-table th { font-size: 11px; }
+
+    .income-name,
+    .legend-name,
+    .preview-name,
+    .cal-popup-card-name { font-size: 13px; }
+
+    /* 日历格子字号稍大 */
+    .work-calendar { font-size: 11px; }
+    .cal-date { font-size: 12px; }
+    .calendar-header { font-size: 13px; }
+    .cal-legend-item { font-size: 10px; }
+
+    /* 弹出卡片变宽 */
+    .cal-popup { width: 320px; }
+
+    /* 卡片字号 */
+    .fund-flow-card, .income-card,
+    .quick-card, .order-status-card,
+    .message-center-card { padding: 14px 16px; }
+
+    /* 快捷按钮标签更清晰 */
+    .qb-label { font-size: 0.72rem; }
+    .qb-icon  { font-size: 19px; }
+  }
+
+  /* ── 超宽屏（1920px+）额外优化 ── */
+  @media (min-width: 1920px) {
+    :root { --sidebar-width: 250px; }
+    .dash-main { padding: 20px 32px; gap: 16px; }
+    .kpi-card { padding: 20px 18px; }
+    .cal-popup { width: 360px; }
   }
 
   /* 收入构成卡底部嵌入消息中心 */
