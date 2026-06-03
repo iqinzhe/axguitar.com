@@ -152,20 +152,18 @@
     background: var(--gradient-sidebar); /* 防止透视 */
   }
   .lang-toggle {
-    display: flex;
-    flex-direction: row;            /* 改为水平排列，实现“一行双列” */
-    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;  /* 两列，形成 2×2 四宫格 */
+    gap: 4px;
     background: rgba(14, 116, 144, 0.1);
     border-radius: 7px;
     padding: 3px;
-    gap: 4px;
   }
   .lang-btn-side {
-    flex: 1;                        /* 两个按钮均分宽度，形成并排双列效果 */
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: clamp(1px, 0.3vh, 2px) 4px;
+    padding: clamp(3px, 0.5vh, 5px) 4px;
     text-align: center;
     border-radius: 5px;
     background: transparent;
@@ -174,11 +172,14 @@
     cursor: pointer;
     font-size: clamp(0.68rem, 1vh, 0.8rem);
     color: var(--gray-700);
-    white-space: nowrap;            /* 文字禁止换行，保证双列紧凑 */
+    white-space: nowrap;
   }
   .lang-btn-side:hover { background: rgba(14, 116, 144, 0.2); }
   .lang-btn-side:active { transform: scale(0.98); }
   .lang-btn-side.active-lang { background: rgba(14, 116, 144, 0.35); color: var(--primary); border-color: rgba(14, 116, 144, 0.5); }
+  .lang-btn-refresh { color: var(--gray-600); }
+  .lang-btn-exit    { color: #dc2626; }
+  .lang-btn-exit:hover { background: rgba(220, 38, 38, 0.12) !important; }
 
   /* 顶部栏：手机端显示，桌面端隐藏（侧边栏已有相同信息） */
   .dash-topbar {
