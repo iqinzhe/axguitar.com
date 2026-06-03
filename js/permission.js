@@ -281,7 +281,8 @@
         },
 
         canPayOrderDetails(order) {
-            if (!order || this.isAdmin() || order.status !== 'active') return false;
+            if (!order || order.status !== 'active') return false;
+            if (this.isAdmin()) return true;   // 管理员可操作全部门店订单
             return order.store_id === this.getCurrentStoreId();
         },
 
