@@ -1,4 +1,4 @@
-// fee-config.js - v2.1 (服务费固定2%取整到万位，保留手工修改能力)
+// fee-config.js - v2.2 (修复：补全 ≤500,000 管理费阶梯；删除死配置 FIXED_PERCENT；服务费中段改用常量)
 
 'use strict';
 
@@ -8,17 +8,17 @@
 
     const FeeConfig = {
         ADMIN_FEE_TIERS: [
-            { max: 3000000, fee: 30000 },
-            { max: Infinity, feePercent: 1 }
+            { max: 500000,  fee: 20000 },   // ≤ 500,000：固定 20,000
+            { max: 3000000, fee: 30000 },   // ≤ 3,000,000：固定 30,000
+            { max: Infinity, feePercent: 1 } // > 3,000,000：按 1%（进位取整到万）
         ],
         
         SERVICE_FEE_CONFIG: {
-            FREE_THRESHOLD: 3000000,
-            PERCENT_THRESHOLD: 5000000,
-            FIXED_PERCENT: 2,
-            MIN_PERCENT: 2,
-            MAX_PERCENT: 10,
-            DEFAULT_PERCENT: 2,
+            FREE_THRESHOLD:    3000000, // ≤ 3,000,000：免服务费
+            PERCENT_THRESHOLD: 5000000, // 3,000,001 ~ 5,000,000：固定 1%
+            MIN_PERCENT: 2,             // 最低百分比 2%
+            MAX_PERCENT: 10,            // 最高百分比 10%
+            DEFAULT_PERCENT: 2,         // 默认百分比 2%
         },
         
         DEFAULT_INTEREST_RATE: 0.10,
@@ -32,9 +32,15 @@
         
         calculateAdminFee(loanAmount) {
             if (!loanAmount || loanAmount <= 0) return 0;
-            if (loanAmount <= 3000000) return 30000;
-            const rawFee = loanAmount * 0.01;
-            return Math.ceil(rawFee / 10000) * 10000;
+            for (const tier of this.ADMIN_FEE_TIERS) {
+                if (loanAmount <= tier.max) {
+                    if (tier.fee !== undefined) return tier.fee;
+                    // feePercent 分支（> 3,000,000）：按比例后进位取整到万
+                    const rawFee = loanAmount * (tier.feePercent / 100);
+                    return Math.ceil(rawFee / 10000) * 10000;
+                }
+            }
+            return 0;
         },
         
         calculateServiceFee(loanAmount, percent) {
@@ -44,10 +50,10 @@
             if (loanAmount <= cfg.FREE_THRESHOLD) {
                 return { percent: 0, amount: 0 };
             }
-            // 300万~500万：固定1%，不受传入 percent 影响
+            // 300万~500万：固定 1%（等同 MIN_PERCENT 下限），不受传入 percent 影响
             if (loanAmount <= cfg.PERCENT_THRESHOLD) {
-                const amount = Math.ceil(loanAmount * 0.01 / 10000) * 10000;
-                return { percent: 1, amount };
+                const amount = Math.ceil(loanAmount * (cfg.MIN_PERCENT / 100) / 10000) * 10000;
+                return { percent: cfg.MIN_PERCENT, amount };
             }
             // >500万：使用传入 percent，范围限制在 MIN~MAX 之间
             let validPercent = percent;
@@ -137,5 +143,5 @@
         window.Utils.calculatePawnDueDate = FeeConfig.calculatePawnDueDate.bind(FeeConfig);
     }
     
-    console.log('✅ JF.FeeConfig v2.2 (服务费可手工修改)');
+    console.log('✅ JF.FeeConfig v2.2 (补全管理费阶梯；删除 FIXED_PERCENT 死配置；服务费中段改用常量)');
 })();
