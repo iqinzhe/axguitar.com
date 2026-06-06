@@ -1405,21 +1405,25 @@
             try {
                 const monthlyRate = currentOrder.agreed_interest_rate || Utils.DEFAULT_AGREED_INTEREST_RATE;
                 const remainPrincipal = (currentOrder.loan_amount||0) - (currentOrder.principal_paid||0);
-                const theoreticalInterest = remainPrincipal * monthlyRate * months;
-                let paidAmount = (actualPaid!==null && !isNaN(actualPaid) && actualPaid>0) ? actualPaid : theoreticalInterest;
+                // 修复：IEEE 754 浮点误差（如 0.085 × 9600000 = 816000.0000000001）会导致
+                // shortfallToTrack/principalAdjustment 出现极小的非零浮点数（如 1.16e-10），
+                // 写入数据库 bigint 列时触发 "invalid input syntax for type bigint" 错误。
+                // 解决方案：所有金额在参与比较和写库前统一用 Math.round() 取整到最近整数。
+                const theoreticalInterest = Math.round(remainPrincipal * monthlyRate * months);
+                let paidAmount = (actualPaid!==null && !isNaN(actualPaid) && actualPaid>0) ? Math.round(actualPaid) : theoreticalInterest;
                 let interestToRecord = paidAmount, principalAdjustment=0, shortfallToTrack=0;
                 
                 if(paidAmount >= theoreticalInterest){
                     interestToRecord = theoreticalInterest;
-                    principalAdjustment = paidAmount - theoreticalInterest;
+                    principalAdjustment = paidAmount - theoreticalInterest; // 两个整数之差，必为整数
                 } else {
                     interestToRecord = paidAmount;
-                    shortfallToTrack = theoreticalInterest - paidAmount;
+                    shortfallToTrack = theoreticalInterest - paidAmount;   // 两个整数之差，必为整数
                 }
                 
                 const newPaidMonths = (currentOrder.interest_paid_months||0) + months;
-                const newPaidTotal = (currentOrder.interest_paid_total||0) + interestToRecord;
-                const newShortfall = (currentOrder.interest_shortfall||0) + shortfallToTrack;
+                const newPaidTotal = Math.round((currentOrder.interest_paid_total||0) + interestToRecord);
+                const newShortfall = Math.round((currentOrder.interest_shortfall||0) + shortfallToTrack);
                 const maxMonths = currentOrder.max_extension_months || 10;
                 if (months === 1 && newPaidMonths > maxMonths) {
                     throw new Error(Utils.lang==='id'?`❌ Mencapai batas maksimum perpanjangan (${maxMonths} bulan)`:`❌ 已达到最大延期期限 (${maxMonths}个月)`);
@@ -1444,15 +1448,15 @@
                     interest_paid_total: newPaidTotal,
                     interest_shortfall: newShortfall,
                     next_interest_due_date: nextDue,
-                    monthly_interest: remainPrincipal * monthlyRate,
+                    monthly_interest: Math.round(remainPrincipal * monthlyRate), // 同样取整，防止浮点写入 bigint
                     fund_status: 'extended',
                     overdue_days: 0,              // 修复：还款后立即清零逾期天数
                     liquidation_status: 'normal', // 修复：还款后恢复正常状态
                     updated_at: nowStr()
                 };
                 if(principalAdjustment>0){
-                    const newPrincipalPaid = (currentOrder.principal_paid||0) + principalAdjustment;
-                    const newPrincipalRemaining = (currentOrder.loan_amount||0) - newPrincipalPaid;
+                    const newPrincipalPaid = Math.round((currentOrder.principal_paid||0) + principalAdjustment);
+                    const newPrincipalRemaining = Math.round((currentOrder.loan_amount||0) - newPrincipalPaid);
                     updates.principal_paid = newPrincipalPaid;
                     updates.principal_remaining = newPrincipalRemaining;
                     if(newPrincipalRemaining<=0){
