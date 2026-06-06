@@ -687,7 +687,7 @@
                     // 行2
                     { label: lang==='id' ? 'Nama Jaminan'    : '质押物品名', value: order.collateral_name },
                     { label: lang==='id' ? 'Jumlah Pinjaman' : '贷款金额',   value: Utils.formatCurrency(order.loan_amount) },
-                    { label: lang==='id' ? 'Suku Bunga'      : '约定利率',   value: (monthlyRate*100).toFixed(0)+'%' },
+                    { label: lang==='id' ? 'Suku Bunga'      : '约定利率',   value: (monthlyRate*100).toFixed(1)+'%' },
                     { label: lang==='id' ? 'Jenis Cicilan'   : '还款方式',   value: repayTypeLabel },
                     // 行3
                     { label: lang==='id' ? 'Bunga Bulanan'   : '月利息',     value: Utils.formatCurrency(currentMonthlyInterest) },
@@ -982,7 +982,7 @@
                 '<p><strong>' + t('admin_fee') + ':</strong> ' + Utils.formatCurrency(order.admin_fee) + ' — ' + adminFeeStatus + '</p>' +
                 '<p><strong>' + t('service_fee') + ':</strong> ' + Utils.formatCurrency(order.service_fee_amount || 0) + ' (' + (order.service_fee_percent || 0) + '%) — ' + serviceFeeStatus + '</p>' +
                 (order.repayment_type !== 'fixed' ?
-                    '<p><strong>' + (lang === 'id' ? 'Bunga Bulanan (Saat Ini)' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? 'Berdasarkan sisa pokok' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(0) + '%）</small></p>' +
+                    '<p><strong>' + (lang === 'id' ? 'Bunga Bulanan (Saat Ini)' : '月利息（当前）') + ':</strong> ' + Utils.formatCurrency(currentMonthlyInterest) + ' <small>（' + (lang === 'id' ? 'Berdasarkan sisa pokok' : '基于剩余本金') + ' ' + Utils.formatCurrency(remainingPrincipal) + ' × ' + (monthlyRate*100).toFixed(1) + '%）</small></p>' +
                     '<p><strong>' + (lang === 'id' ? 'Bunga Terbayar' : '已付利息') + ':</strong> ' + order.interest_paid_months + ' ' + (lang === 'id' ? 'bulan' : '个月') + ' (' + Utils.formatCurrency(order.interest_paid_total) + ')</p>' +
                     '<p><strong>' + (lang === 'id' ? 'Sisa Pokok' : '剩余本金') + ':</strong> ' + Utils.formatCurrency(remainingPrincipal) + '</p>' +
                     '<p><strong>' + t('payment_due_date') + ':</strong> ' + nextDueDate + '</p>'

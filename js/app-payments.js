@@ -347,7 +347,7 @@
                                 <div class="card-body">
                                     <div class="info-box success-box">
                                         <div class="info-row"><span>📌 ${lang === 'id' ? 'Pembayaran ke-' : '第'} ${nextInterestNumber} ${lang === 'id' ? 'kali' : '次'}</span><strong style="color:var(--primary)">${Utils.formatCurrency(currentMonthlyInterest)}</strong></div>
-                                        <div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(0)}%</strong></div>
+                                        <div class="info-row"><span>📈 ${t('agreed_rate')}:</span><strong>${(monthlyRate*100).toFixed(1)}%</strong></div>
                                     </div>
                                     <div class="action-input-group">
                                         <label class="action-label">🔢 ${lang === 'id' ? 'Jumlah Bulan Dibayar' : '缴纳期数'}:</label>
@@ -459,7 +459,7 @@
                             <div class="summary-item"><span class="label">💎 ${t('collateral_name')}:</span><span class="value">${Utils.escapeHtml(order.collateral_name || '-')}</span></div>
                             <div class="summary-item"><span class="label">💰 ${t('service_fee')}:</span><span class="value">${Utils.formatCurrency(serviceFeeAmount)} (${order.service_fee_percent || 0}%) — <span class="income">${serviceFeePaidInfo}</span></span></div>
                             <div class="summary-item"><span class="label">📋 ${t('admin_fee')}:</span><span class="value">${Utils.formatCurrency(order.admin_fee)} — <span class="income">${adminFeePaidInfo}</span></span></div>
-                            <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.10)*100).toFixed(0)}%</span></div>
+                            <div class="summary-item"><span class="label">📈 ${t('agreed_rate')}:</span><span class="value">${((order.agreed_interest_rate || 0.10)*100).toFixed(1)}%</span></div>
                         </div>
                     </div>
                     ${fixedHtml}
@@ -543,8 +543,8 @@
                     : '';
 
                 const previewMsg = lang === 'id'
-                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}${isPrepaid ? ` s/d ke-${nextInterestNumber + selectedMonths - 1}` : ''}\nTanggal: ${paymentDate}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(0)}%\nBunga per bln: ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}${prepaidNote}${shortfallWarning}\n\nLanjutkan?`
-                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期${isPrepaid ? `～第${nextInterestNumber + selectedMonths - 1}期` : ''}\n入账日期: ${paymentDate}\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(0)}%\n每期利息: ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}${prepaidNote}${shortfallWarning}\n\n确认收款？`;
+                    ? `📋 Konfirmasi Pembayaran Bunga\nPesanan: ${order.order_id}\nNasabah: ${order.customer_name}\nPeriode: ke-${nextInterestNumber}${isPrepaid ? ` s/d ke-${nextInterestNumber + selectedMonths - 1}` : ''}\nTanggal: ${paymentDate}\nSisa Pokok: ${Utils.formatCurrency(remainingPrincipal)}\nSuku Bunga: ${(monthlyRate*100).toFixed(1)}%\nBunga per bln: ${Utils.formatCurrency(theoreticalInterest)}\nJumlah Dibayar: ${Utils.formatCurrency(actualPaid)}\nMetode: ${methodName}${prepaidNote}${shortfallWarning}\n\nLanjutkan?`
+                    : `📋 利息收款确认\n订单号: ${order.order_id}\n客户: ${order.customer_name}\n期数: 第${nextInterestNumber}期${isPrepaid ? `～第${nextInterestNumber + selectedMonths - 1}期` : ''}\n入账日期: ${paymentDate}\n剩余本金: ${Utils.formatCurrency(remainingPrincipal)}\n月利率: ${(monthlyRate*100).toFixed(1)}%\n每期利息: ${Utils.formatCurrency(theoreticalInterest)}\n实际缴纳: ${Utils.formatCurrency(actualPaid)}\n入账方式: ${methodName}${prepaidNote}${shortfallWarning}\n\n确认收款？`;
 
                 const confirmed = await Utils.toast.confirm(previewMsg);
                 if (!confirmed) return;
