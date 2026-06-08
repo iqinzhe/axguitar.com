@@ -308,12 +308,17 @@
         },
 
         // ==================== 支出操作权限（含门店隔离） ====================
-        // [优化-2 新增] 补全支出的门店隔离检查，与客户/订单保持一致的安全模型
+        // 规则：
+        //   - 查看/新增支出：门店账号（店长/员工）可操作本门店记录
+        //   - 修改/删除/核销：仅管理员（总部权限），门店无论角色一律禁止
         canOperateExpense(expense) {
             if (this.isAdmin()) return true;
             if (!expense) return false;
             return expense.store_id === this.getCurrentStoreId();
         },
+        canEditExpenseRecord()   { return this.isAdmin(); },  // 修改支出：仅管理员
+        canDeleteExpenseRecord() { return this.isAdmin(); },  // 删除支出：仅管理员
+        canReconcileExpense()    { return this.isAdmin(); },  // 核销支出：仅管理员
     };
 
     // 挂载到命名空间

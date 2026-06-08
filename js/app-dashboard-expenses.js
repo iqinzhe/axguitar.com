@@ -198,15 +198,15 @@
                     const reconciled = exp.is_reconciled
                         ? `<span class="badge badge--completed">${lang === 'id' ? 'Sudah' : '已核'}</span>`
                         : `<span class="badge badge--active">${lang === 'id' ? 'Belum' : '未核'}</span>`;
-                    const deleteBtn = (isAdmin || PERMISSION.isStoreManager())
+                    // 修改/删除/核销均为管理员专属操作，门店账号无操作按钮
+                    const deleteBtn = isAdmin && !exp.is_reconciled
                         ? `<button onclick="APP.deleteExpense('${exp.id}')" class="btn btn--danger btn--sm">🗑️</button>`
                         : '';
-                    const editBtn = (isAdmin || PERMISSION.isStoreManager())
+                    const editBtn = isAdmin && !exp.is_reconciled
                         ? `<button onclick="APP.editExpense('${exp.id}')" class="btn btn--warning btn--sm" style="margin-right:4px;">✏️</button>`
                         : '';
-                    const reconcileBtn = (isAdmin || PERMISSION.isStoreManager()) && !exp.is_reconciled
-                        ? `<button onclick="APP.reconcileExpense('${exp.id}')" class="btn btn--sm" style="margin-right:4px;">${lang === 'id' ? '✓ Cocok' : '✓ 核销'}</button>`
-                        : '';
+                    // 单条核销为管理员专属（reconcileExpense 函数尚未实现，暂不渲染按钮）
+                    const reconcileBtn = '';
                     return `<tr>
                         <td class="col-date">${date}</td>
                         <td class="col-type">${category}</td>
