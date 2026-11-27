@@ -1,1 +1,473 @@
+/* === 全局基准设置 === */
+:root {
+  --primary-color: #4361ee;
+  --secondary-color: #7209b7;
+  --neutral-gray: rgb(128, 128, 128);
+  --glass-dark: rgba(0, 0, 0, 0.3);
+  --text-white: #fff;
+  --text-dark: #212529;
+  --text-light: #f8f9fa;
+  --spacing-xs: 0.8rem;
+  --spacing-sm: 1.6rem;
+  --spacing-md: 2.4rem;
+  --spacing-lg: 3.2rem;
+  --border-radius: 0.8rem;
+  --border-radius-sm: 0.4rem;
+  --shadow: 0 4px 12px rgba(0,0,0,0.1);
+  --transition: all 0.3s ease;
+  --menu-chip-bg: rgba(240, 230, 210, 0.92);
+  --menu-chip-border: rgba(240, 210, 180, 0.6);
+  --top-bar-height: 60px;
+  --nav-link-font-size: 1.2rem;
+  --button-bg-color: rgba(240, 230, 210, 0.92);
+  --button-text-color: #4361ee;
+  --button-hover-bg: rgba(240, 230, 210, 1);
+}
 
+html {
+  font-size: 16px;
+  line-height: 1.6;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: var(--top-bar-height) 15px 0 15px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.2rem;
+  color: var(--text-white);
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  background: #000000 !important;
+}
+
+/* === AX品牌渐变背景 with 蒙版 === */
+body.ax-gradient-bg {
+  background: 
+    linear-gradient(rgba(30, 30, 30, 0.6), rgba(30, 30, 30, 0.6)),
+    linear-gradient(135deg, #4a67b3, #a57d7d, #7BC4C4) !important;
+  background-attachment: fixed !important;
+  min-height: 100vh;
+  background-blend-mode: multiply;
+}
+
+/* === 标题样式 === */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: bold;
+  line-height: 1.3;
+  margin-top: 1.2em;
+  margin-bottom: 0.6em;
+  color: #ffffff !important;
+}
+
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.4rem; }
+h4 { font-size: 1.3rem; }
+h5 { font-size: 1.2rem; }
+h6 { font-size: 1rem; }
+h1 { text-wrap: balance; }
+
+/* === 段落 === */
+p {
+  margin-bottom: 1em;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* ===== 统一按钮样式 ===== */
+/* 基础按钮样式 - 所有按钮统一 */
+.base-button,
+.series-card-cta,
+.order-button,
+.detail-button,
+.nav-button {
+  padding: 5px 15px;
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  text-decoration: none;
+  border-radius: var(--border-radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: var(--transition);
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  min-width: 100px;
+  text-align: center;
+}
+
+.base-button:hover,
+.series-card-cta:hover,
+.order-button:hover,
+.detail-button:hover,
+.nav-button:hover {
+  background-color: var(--button-hover-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* 特定按钮变体 */
+.base-button.primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.base-button.outline {
+  background-color: transparent;
+  border: 2px solid var(--button-bg-color);
+  color: var(--button-bg-color);
+}
+
+/* 按钮尺寸变体 */
+.base-button.small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  min-width: 100px;
+}
+
+.base-button.large {
+  padding: 12px 24px;
+  font-size: 1rem;
+  min-width: 140px;
+}
+
+/* === 汉堡菜单优化 === */
+.menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 999;
+  background: #000000 !important;
+  text-align: center;
+  padding: 8px 0;
+  max-height: 60px; /* 限制最大高度 */
+  overflow-x: auto; /* 允许水平滚动 */
+  overflow-y: hidden; /* 禁止垂直滚动 */
+}
+
+.menu.show, 
+.menu--show { 
+  display: block; 
+  animation: slideDown 0.25s ease; 
+}
+
+.menu__list {
+  display: flex !important;
+  flex-wrap: nowrap;
+  justify-content: flex-start; /* 改为左对齐以便滚动 */
+  gap: 8px;
+  padding: 0 12px;
+  margin: 0;
+  list-style: none;
+  width: max-content; /* 允许内容决定宽度 */
+  min-width: 100%; /* 但至少占满容器 */
+}
+
+.menu__item { 
+  border: 0 !important; 
+  padding: 0 !important; 
+  margin: 0;
+  background: #000000 !important;
+  flex-shrink: 0; /* 防止项目被压缩 */
+}
+
+.menu__link {
+  display: inline-flex !important;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--border-radius);
+  background: var(--menu-chip-bg);
+  border: 1px solid var(--menu-chip-border);
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 1rem; /* 稍微减小字体大小 */
+  text-decoration: none;
+  line-height: 1;
+  transition: var(--transition);
+  white-space: nowrap; /* 防止文字换行 */
+}
+
+.menu__link.active {
+  border: 2px solid #ffffff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+  color: #fff !important;
+}
+
+.menu__link:hover {
+  background: rgba(240, 230, 210, 0.98);
+  color: var(--primary-color);
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+/* 按钮文字 */
+.button-text {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #333;
+}
+
+/* 导航容器样式 */
+.prev-next-nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 0 10px;
+  margin: 10px 0 5px;
+}
+
+.bottom-series-nav {
+  margin-bottom: 20px;
+}
+
+.back-nav {
+  margin-top: 20px;
+  text-align: center;
+}
+
+/* === 卡片样式 === */
+.ax-card {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+img { 
+  max-width: 100%; 
+  height: auto; 
+  display: block; 
+}
+
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+}
+
+/* ==================================================
+   布局工具类
+================================================== */
+.layout-flex { display: flex; }
+.layout-flex-center { display: flex; justify-content: center; align-items: center; }
+.layout-flex-column { flex-direction: column; }
+.layout-flex-wrap { flex-wrap: wrap; }
+.layout-justify-between { justify-content: space-between; }
+.layout-justify-around { justify-content: space-around; }
+.layout-align-center { align-items: center; }
+.layout-grid { display: grid; }
+.layout-grid-col-2 { grid-template-columns: repeat(2, 1fr); }
+.layout-grid-col-3 { grid-template-columns: repeat(3, 1fr); }
+.layout-grid-responsive { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.layout-gap-sm { gap: var(--spacing-xs); }
+.layout-gap-md { gap: var(--spacing-sm); }
+
+.container { 
+  width: 100%; 
+  max-width: 1200px; 
+  padding: var(--spacing-sm); 
+  margin: 0 auto; 
+}
+
+/* ==================================================
+   顶部栏样式
+================================================== */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+  background: #000000 !important;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.top-bar__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+}
+
+.top-bar__share {
+  font-size: 35px;
+  cursor: pointer;
+  min-width: 50px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.top-bar__center { 
+  text-align: center;
+  flex: 1;
+  margin: 0 10px;
+}
+
+.top-bar__logo { 
+  height: 30px;
+  display: block;
+  margin: 0 auto;
+}
+
+.top-bar__slogan {
+  font-size: 16px;
+  margin: 2px 0 0;
+  color: #ffffff;
+  animation: breathing 2s infinite;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes breathing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ==================================================
+   汉堡菜单组件
+================================================== */
+.menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 999;
+  background: #000000 !important;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.menu.show, 
+.menu--show { 
+    display: block; 
+    animation: slideDown 0.25s ease; 
+}
+
+.top-bar__hamburger,
+.menu__button {
+  color: #ffffff !important;
+  font-size: 35px !important;
+  min-width: 50px !important;
+  min-height: 50px !important;
+  line-height: 1 !important;
+}
+
+.menu__list {
+  display: flex !important;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0;
+  padding: 0 12px;
+  margin: 0;
+  list-style: none;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.menu__item { 
+  border: 0 !important; 
+  padding: 0 !important; 
+  margin: 0 4px;
+  background: #000000 !important;
+  flex-shrink: 0;
+}
+
+@keyframes slideDown { 
+  from { opacity: 0; transform: translateY(-10px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
+
+/* ==================================================
+   底部栏样式 - 优化版
+================================================== */
+.site-footer {
+  width: 100%;
+  max-width: 100%;
+  margin: 30px 0 0 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  box-sizing: border-box;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  height: auto;
+  min-height: 45px;
+}
+
+.site-footer__label { 
+  font-weight: 600; 
+  font-size: 1.1rem;
+  color: var(--text-white); 
+}
+
+.site-footer__logo { 
+  height: 20px;
+  width: auto; 
+}
+
+.site-footer:hover { 
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.site-footer:active { 
+  background: rgba(0, 0, 0, 0.4); 
+}
+
+.site-footer:active .site-footer__label, 
+.site-footer:active .site-footer__logo { 
+  transform: scale(0.95); 
+}
+
+/* ==================================================
+   响应式设计
+================================================== */
+@media (max-width: 767px) {
+  body {
+    padding: var(--top-bar-height) 10px 0 10px;
+    font-size: 1rem;
+  }
+  
+  .site-footer {
+    margin: 20px 0 0 0;
+    padding: 10px 12px;
+    min-height: 45px;
+  }
+  
+  .site-footer__label {
+    font-size: 1rem;
+  }
+  
+  .site-footer__logo {
+    height: 18px;
+  }
+  
+ 
