@@ -1,0 +1,27 @@
+# AX吉他网站GitHub Pages专用配置
+title: AX Bass & Guitar
+description: 高端定制吉他展示网站
+baseurl: ""  # 如果是项目站点（非用户站点），改为仓库名（如"/ax-guitar"）
+url: ""       # 您的自定义域名（若无则留空）
+
+# 关键配置：包含非标准目录
+include:
+  - data       # 允许加载data文件夹
+  - js         # 确保JS文件被处理
+  - images     # 确保图片资源被处理
+  - product    # 包含产品页面目录
+
+# 构建排除项（加速构建）
+exclude:
+  - README.md
+  - LICENSE
+  - node_modules
+
+# 插件配置（GitHub Pages默认支持）
+plugins:
+  - jekyll-feed
+
+# 自定义变量（供模板使用）
+custom:
+  brand_logo: "/images/logo.png"
+  default_series: "a"
