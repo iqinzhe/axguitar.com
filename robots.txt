@@ -1,3 +1,0 @@
-# 禁止所有搜索引擎抓取任何页面
-User-agent: *
-Disallow: /
