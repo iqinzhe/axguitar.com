@@ -1,0 +1,27 @@
+生成说明
+--------------
+我已将维京战斧图标优化（去白边、羽化圆角、加暗色内边距防裁切），并生成了/icons版本文件：
+
+- /icons/apple-touch-icon.png (180×180) — iOS 主屏幕图标
+- /icons/icon-192.png (192×192) — Android 推荐尺寸
+- /icons/icon-512.png (512×512) — Android 高分辨率
+- /icons/favicon-32x32.png (32×32) — PNG favicon
+- /icons/favicon-16x16.png (16×16) — PNG favicon 小尺寸
+- /icons/favicon.ico — 多尺寸 ICO
+- /icons/manifest.json — Web App manifest
+
+使用方法：
+1. 将整个/icons文件夹上传到网站根目录
+2. 在HTML的<head>中添加：
+
+<!-- Put these lines inside your <head> -->
+<link rel="shortcut icon" href="/icons/favicon.ico" type="image/x-icon">
+<link rel="icon" href="/icons/favicon-32x32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/icons/manifest.json">
+<meta name="theme-color" content="#ffffff">
+
+
+3. 清浏览器缓存
+4. iOS: Safari 打开网站 → 分享 → 添加到主屏幕
+   Android: Chrome 打开网站 → 菜单 → 添加到主屏幕
