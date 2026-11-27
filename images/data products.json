@@ -1,0 +1,115 @@
+{
+  "series": [
+    {
+      "id": "a",
+      "name": "Series A",
+      "description": "螺栓固定结构带来的额外弹性和响应，提供高性价比的现代音色，从一开始栓接就是吉他历史的重要组成部分。\n螺栓连接的贝斯，除了价格相对便宜，更容易维护和修理，它占据市场主流。由此发展出我们的第一批A系列经典传统产品。",
+      "cover": "images/series-a.jpg",
+      "models": [
+        {
+          "id": "a1",
+          "name": "A1 Model",
+          "image": "images/a1.jpg",
+          "features": "专为摇滚设计的高输出型号，提供强劲的中频和饱满的低音响应",
+          "specs": [
+            "琴体: 桤木",
+            "琴颈: 枫木",
+            "指板: 玫瑰木",
+            "拾音器: Humbucker × 2",
+            "琴桥: 固定式"
+          ],
+          "ctaColor": "rgba(255,82,82,0.7)"
+        },
+        {
+          "id": "a2",
+          "name": "A2 Model",
+          "image": "images/a2.jpg",
+          "features": "适合蓝调和爵士的温暖音色，提供清晰的高频响应",
+          "specs": [
+            "琴体: 桃花心木",
+            "琴颈: 枫木",
+            "指板: 乌木",
+            "拾音器: Single Coil × 3",
+            "琴桥: 浮动式"
+          ],
+          "ctaColor": "rgba(255,82,82,0.7)"
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "name": "Series B",
+      "description": "通颈连体贝斯工艺较为复杂，常被视为高端贝斯的标志之一。采用多类型木材拼接琴颈与琴体，更具艺术性，视觉冲击力更强，带来更加奢华的外观。\n连体通颈贝斯通颈贝斯在音色、延音、共鸣、稳定性等方面都有一些优点。",
+      "cover": "images/series-b.jpg",
+      "models": [
+        {
+          "id": "b1",
+          "name": "B1 Model",
+          "image": "images/b1.jpg",
+          "features": "灵感源自50年代经典吉他，重现复古音色",
+          "specs": [
+            "琴体: 桤木",
+            "琴颈: 枫木",
+            "指板: 枫木",
+            "拾音器: P90 × 2",
+            "琴桥: 复古式"
+          ],
+          "ctaColor": "rgba(76,175,80,0.7)"
+        },
+        {
+          "id": "b2",
+          "name": "B2 Model",
+          "image": "images/b2.jpg",
+          "features": "经典设计结合现代技术，提供更稳定的音准",
+          "specs": [
+            "琴体: 桃花心木",
+            "琴颈: 枫木",
+            "指板: 玫瑰木",
+            "拾音器: Humbucker × 2",
+            "琴桥: 现代固定式"
+          ],
+          "ctaColor": "rgba(76,175,80,0.7)"
+        }
+      ]
+    },
+    {
+      "id": "d",
+      "name": "Series D",
+      "description": "人体工学扭曲琴颈贝斯经过精心设计，能够顺应手腕和手指的自然运动。与传统琴颈不同，它会略微倾斜以适应您的演奏姿势，从而减轻压力并提高舒适度。\n传统制琴工艺中对琴颈的要求是“平和直”一旦扭曲变形即为不良。而我们颠覆传统顺势而为，充分发挥每一块材料的自然特性，让扭曲变得更疯狂一些！",
+      "cover": "images/D1.jpg",
+      "models": [
+        {
+          "id": "d1",
+          "name": "Model D",
+          "image": "images/D2.jpg",
+          "features": "标准款扭曲琴颈贝斯，适合多种音乐风格",
+          "specs": ["特殊扭曲琴颈设计", "符合人体工学", "减少演奏疲劳"],
+          "sections": [
+            {
+              "type": "text-with-image",
+              "title": "What is a Twisted Neck?",
+              "content": "The twisted neck is a precision-engineered design that follows the natural motion of your wrist and fingers. Unlike a traditional neck, it tilts slightly to match your playing posture, reducing strain and increasing comfort.",
+              "image": "images/D1.jpg",
+              "layout": "left" 
+            },
+            {
+              "type": "benefits",
+              "title": "Key Benefits",
+              "items": [
+                {"title": "Natural Wrist Position", "desc": "Less tension, more comfort."},
+                {"title": "Extended Playtime", "desc": "Perform longer without fatigue."},
+                {"title": "Better Finger Reach", "desc": "Improved ergonomics for complex lines."},
+                {"title": "Unique Craftsmanship", "desc": "Rare design, high-precision build."}
+              ]
+            },
+            {
+              "type": "comparison",
+              "title": "Traditional vs Twisted Neck",
+              "images": ["images/traditional-neck.jpg", "images/D2.jpg"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
