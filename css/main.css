@@ -1,4 +1,12 @@
-/* === 全局基准设置 === */
+/* =====================================================
+   AXguitar main.css  (优化版)
+   改动要点见文件内「FIX」标记
+===================================================== */
+
+/* === 0. 重置（放最前面，避免和后面规则混淆）=== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* === 1. 全局变量 === */
 :root {
   --primary-color: #4361ee;
   --secondary-color: #7209b7;
@@ -13,80 +21,81 @@
   --spacing-lg: 3.2rem;
   --border-radius: 0.8rem;
   --border-radius-sm: 0.4rem;
-  --shadow: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   --transition: all 0.3s ease;
   --menu-chip-bg: rgba(240, 230, 210, 0.92);
   --menu-chip-border: rgba(240, 210, 180, 0.6);
-  --top-bar-height: 60px;
   --nav-link-font-size: 1.2rem;
   --button-bg-color: rgba(240, 230, 210, 0.92);
   --button-text-color: #4361ee;
   --button-hover-bg: rgba(240, 230, 210, 1);
+
+  /* FIX: 顶栏高度固定为 64px（原来写 60px，但手机上实际被撑到约 105px，内容被盖住） */
+  --top-bar-height: 64px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --page-max: 1200px;
 }
 
 html {
   font-size: 16px;
   line-height: 1.6;
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  margin: 0;
-  padding: var(--top-bar-height) 15px 0 15px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 1.2rem;
+  /* FIX: 顶部留白 = 顶栏高度 + 刘海安全区 + 12px 呼吸空间 */
+  padding: calc(var(--top-bar-height) + var(--safe-top) + 12px) 15px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+               'Microsoft YaHei', Roboto, sans-serif;
+  font-size: 1.1rem;
   color: var(--text-white);
-  max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
   min-height: 100vh;
+  min-height: 100dvh;            /* FIX: 手机浏览器地址栏伸缩时不跳动 */
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  background: #000000 !important;
+  background: #000;
 }
 
-/* === AX品牌渐变背景 with 蒙版 === */
+/* === 2. AX 品牌渐变背景 === */
 body.ax-gradient-bg {
-  background: 
+  background:
     linear-gradient(rgba(30, 30, 30, 0.6), rgba(30, 30, 30, 0.6)),
-    linear-gradient(135deg, #4a67b3, #a57d7d, #7BC4C4) !important;
-  background-attachment: fixed !important;
-  min-height: 100vh;
+    linear-gradient(135deg, #4a67b3, #a57d7d, #7BC4C4);
+  background-attachment: fixed;
   background-blend-mode: multiply;
 }
+/* FIX: iOS Safari 不支持 fixed 背景（会被放大错位），改为 scroll */
+@supports (-webkit-touch-callout: none) {
+  body.ax-gradient-bg { background-attachment: scroll; }
+}
 
-/* === 标题样式 === */
+/* === 3. 标题 / 段落 === */
 h1, h2, h3, h4, h5, h6 {
   font-weight: bold;
   line-height: 1.3;
-  margin-top: 1.2em;
-  margin-bottom: 0.6em;
-  color: #ffffff !important;
+  margin: 1.2em 0 0.6em;
+  color: #fff;
 }
-
-h1 { font-size: 1.6rem; }
+h1 { font-size: 1.6rem; text-wrap: balance; }
 h2 { font-size: 1.5rem; }
 h3 { font-size: 1.4rem; }
 h4 { font-size: 1.3rem; }
 h5 { font-size: 1.2rem; }
 h6 { font-size: 1rem; }
-h1 { text-wrap: balance; }
 
-/* === 段落 === */
-p {
-  margin-bottom: 1em;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
+p { margin-bottom: 1em; color: rgba(255, 255, 255, 0.9); }
 
-/* ===== 统一按钮样式 ===== */
-/* 基础按钮样式 - 所有按钮统一 */
+img { max-width: 100%; height: auto; display: block; }
+
+/* === 4. 统一按钮 === */
 .base-button,
 .series-card-cta,
 .order-button,
 .detail-button,
 .nav-button {
-  padding: 5px 15px;
+  padding: 6px 15px;
   background-color: var(--button-bg-color);
   color: var(--button-text-color);
   text-decoration: none;
@@ -102,9 +111,9 @@ p {
   cursor: pointer;
   box-shadow: var(--shadow);
   min-width: 100px;
+  min-height: 34px;              /* FIX: 手指好点（原按钮只有约 20px 高） */
   text-align: center;
 }
-
 .base-button:hover,
 .series-card-cta:hover,
 .order-button:hover,
@@ -112,160 +121,36 @@ p {
 .nav-button:hover {
   background-color: var(--button-hover-bg);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
-
-/* 特定按钮变体 */
-.base-button.primary {
-  background-color: var(--primary-color);
-  color: white;
-}
-
+.base-button.primary { background-color: var(--primary-color); color: #fff; }
 .base-button.outline {
   background-color: transparent;
   border: 2px solid var(--button-bg-color);
   color: var(--button-bg-color);
 }
+.base-button.small { padding: 6px 12px; font-size: 0.8rem; }
+.base-button.large { padding: 12px 24px; font-size: 1rem; min-width: 140px; }
 
-/* 按钮尺寸变体 */
-.base-button.small {
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  min-width: 100px;
-}
+.button-text { font-size: 1rem; font-weight: 600; letter-spacing: 0.5px; color: #333; }
 
-.base-button.large {
-  padding: 12px 24px;
-  font-size: 1rem;
-  min-width: 140px;
-}
+.prev-next-nav { display: flex; justify-content: space-between; padding: 15px 0 10px; margin: 10px 0 5px; }
+.bottom-series-nav { margin-bottom: 20px; }
+.back-nav { margin-top: 20px; text-align: center; }
 
-/* === 汉堡菜单优化 === */
-.menu {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  width: 100%;
-  z-index: 999;
-  background: #000000 !important;
-  text-align: center;
-  padding: 8px 0;
-  max-height: 60px; /* 限制最大高度 */
-  overflow-x: auto; /* 允许水平滚动 */
-  overflow-y: hidden; /* 禁止垂直滚动 */
-}
-
-.menu.show, 
-.menu--show { 
-  display: block; 
-  animation: slideDown 0.25s ease; 
-}
-
-.menu__list {
-  display: flex !important;
-  flex-wrap: nowrap;
-  justify-content: flex-start; /* 改为左对齐以便滚动 */
-  gap: 8px;
-  padding: 0 12px;
-  margin: 0;
-  list-style: none;
-  width: max-content; /* 允许内容决定宽度 */
-  min-width: 100%; /* 但至少占满容器 */
-}
-
-.menu__item { 
-  border: 0 !important; 
-  padding: 0 !important; 
-  margin: 0;
-  background: #000000 !important;
-  flex-shrink: 0; /* 防止项目被压缩 */
-}
-
-.menu__link {
-  display: inline-flex !important;
-  align-items: center;
-  height: 36px;
-  padding: 0 14px;
-  border-radius: var(--border-radius);
-  background: var(--menu-chip-bg);
-  border: 1px solid var(--menu-chip-border);
-  color: var(--primary-color);
-  font-weight: 600;
-  font-size: 1rem; /* 稍微减小字体大小 */
-  text-decoration: none;
-  line-height: 1;
-  transition: var(--transition);
-  white-space: nowrap; /* 防止文字换行 */
-}
-
-.menu__link.active {
-  border: 2px solid #ffffff !important;
-  background: rgba(255, 255, 255, 0.15) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
-  color: #fff !important;
-}
-
-.menu__link:hover {
-  background: rgba(240, 230, 210, 0.98);
-  color: var(--primary-color);
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
-}
-
-/* 按钮文字 */
-.button-text {
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  color: #333;
-}
-
-/* 导航容器样式 */
-.prev-next-nav {
-  display: flex;
-  justify-content: space-between;
-  padding: 15px 0 10px;
-  margin: 10px 0 5px;
-}
-
-.bottom-series-nav {
-  margin-bottom: 20px;
-}
-
-.back-nav {
-  margin-top: 20px;
-  text-align: center;
-}
-
-/* === 卡片样式 === */
+/* === 5. 通用卡片 === */
 .ax-card {
-  background: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 25px;
   margin-bottom: 25px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
 
-img { 
-  max-width: 100%; 
-  height: auto; 
-  display: block; 
-}
-
-* { 
-  margin: 0; 
-  padding: 0; 
-  box-sizing: border-box; 
-}
-
-/* ==================================================
-   布局工具类
-================================================== */
+/* === 6. 布局工具类 === */
 .layout-flex { display: flex; }
 .layout-flex-center { display: flex; justify-content: center; align-items: center; }
 .layout-flex-column { flex-direction: column; }
@@ -280,194 +165,164 @@ img {
 .layout-gap-sm { gap: var(--spacing-xs); }
 .layout-gap-md { gap: var(--spacing-sm); }
 
-.container { 
-  width: 100%; 
-  max-width: 1200px; 
-  padding: var(--spacing-sm); 
-  margin: 0 auto; 
-}
+.container { width: 100%; max-width: var(--page-max); padding: var(--spacing-sm); margin: 0 auto; }
 
-/* ==================================================
-   顶部栏样式
-================================================== */
+/* === 7. 顶部栏 === */
+/* FIX: 固定高度 + 标语单行省略，解决手机端标语折成两行、顶栏过高盖住「最新动态」的问题 */
 .top-bar {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
+  top: 0; left: 0; right: 0;
   z-index: 1000;
-  background: #000000 !important;
-  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+  height: calc(var(--top-bar-height) + var(--safe-top));
+  padding-top: var(--safe-top);
+  background: #000;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);   /* FIX: 原为 -2px（阴影朝上，看不见） */
   transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
-
 .top-bar__row {
+  height: var(--top-bar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 0 8px;
 }
-
-.top-bar__share {
-  font-size: 35px;
-  cursor: pointer;
-  min-width: 50px;
-  min-height: 50px;
+.top-bar__share,
+.top-bar__hamburger,
+.menu__button {
+  font-size: 28px;               /* FIX: 35px 过大，撑高顶栏 */
+  line-height: 1;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #fff;
+  cursor: pointer;
+  background: none;
+  border: 0;
 }
-
-.top-bar__center { 
-  text-align: center;
-  flex: 1;
-  margin: 0 10px;
-}
-
-.top-bar__logo { 
-  height: 30px;
-  display: block;
-  margin: 0 auto;
-}
-
+.top-bar__center { flex: 1; min-width: 0; text-align: center; margin: 0 6px; }
+.top-bar__logo { height: 26px; margin: 0 auto; }
 .top-bar__slogan {
-  font-size: 16px;
   margin: 2px 0 0;
-  color: #ffffff;
-  animation: breathing 2s infinite;
+  font-size: clamp(11px, 3.3vw, 15px);
+  line-height: 1.3;
+  color: #fff;
+  white-space: nowrap;           /* FIX: 不换行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  animation: breathing 2s infinite;
 }
+@keyframes breathing { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
-@keyframes breathing {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+/* 图标悬停 / 按下反馈（原来由 main.js 用内联样式实现，改为纯 CSS，触屏不会"卡"在半透明）*/
+@media (hover: hover) {
+  .top-bar__share:hover, .menu__button:hover { opacity: 0.8; }
 }
+.menu__link:active, .compact-nav__link:active { opacity: 0.7; }
+.top-bar__share:focus-visible, .menu__button:focus-visible,
+.menu__link:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-/* ==================================================
-   汉堡菜单组件
-================================================== */
+/* === 8. 汉堡菜单（FIX: 原来 .menu / .menu__list / .menu__item 写了两遍且互相冲突，合并为一份）=== */
 .menu {
   display: none;
   position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  width: 100%;
+  top: 100%; left: 0; right: 0;
   z-index: 999;
-  background: #000000 !important;
-  text-align: center;
+  background: #000;
   padding: 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
-
-.menu.show, 
-.menu--show { 
-    display: block; 
-    animation: slideDown 0.25s ease; 
-}
-
-.top-bar__hamburger,
-.menu__button {
-  color: #ffffff !important;
-  font-size: 35px !important;
-  min-width: 50px !important;
-  min-height: 50px !important;
-  line-height: 1 !important;
-}
+.menu::-webkit-scrollbar { display: none; }
+.menu.show, .menu--show { display: block; animation: slideDown 0.25s ease; }
 
 .menu__list {
-  display: flex !important;
+  display: flex;
   flex-wrap: nowrap;
   justify-content: center;
-  gap: 0;
+  gap: 8px;
   padding: 0 12px;
-  margin: 0;
   list-style: none;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  width: max-content;
+  min-width: 100%;
+}
+.menu__item { flex-shrink: 0; background: #000; }
+.menu__link {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--border-radius);
+  background: var(--menu-chip-bg);
+  border: 1px solid var(--menu-chip-border);
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.menu__link:hover { background: rgba(240, 230, 210, 0.98); opacity: 0.8; }
+.menu__link.active {
+  border: 2px solid #fff;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.menu__item { 
-  border: 0 !important; 
-  padding: 0 !important; 
-  margin: 0 4px;
-  background: #000000 !important;
-  flex-shrink: 0;
-}
+/* === 9. 主体与底部栏 === */
+main { flex: 1 0 auto; width: 100%; padding-bottom: 20px; }
 
-@keyframes slideDown { 
-  from { opacity: 0; transform: translateY(-10px); } 
-  to { opacity: 1; transform: translateY(0); } 
-}
-
-/* ==================================================
-   底部栏样式 - 优化版
-================================================== */
 .site-footer {
   width: 100%;
-  max-width: 100%;
-  margin: 30px 0 0 0;
+  margin: auto 0 calc(12px + env(safe-area-inset-bottom, 0px));  /* 内容少时自动贴底 */
+  padding: 12px 16px;
+  min-height: 45px;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
   cursor: pointer;
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-  box-sizing: border-box;
   border: 1px solid rgba(128, 128, 128, 0.2);
-  height: auto;
-  min-height: 45px;
+  border-radius: 10px;
+}
+.site-footer__label { font-weight: 600; font-size: 1.1rem; color: var(--text-white); }
+.site-footer__logo { height: 20px; width: auto; }
+.site-footer:hover { background: rgba(255, 255, 255, 0.25); }
+.site-footer:active { background: rgba(0, 0, 0, 0.4); }
+.site-footer:active .site-footer__label,
+.site-footer:active .site-footer__logo { transform: scale(0.95); }
+
+/* =====================================================
+   响应式
+   FIX: 原文件最后一个 @media 缺少收尾的 } ，已补全
+===================================================== */
+@media (min-width: 768px) {
+  body { padding-left: 24px; padding-right: 24px; font-size: 1.2rem; }
+  .top-bar__slogan { font-size: 15px; }
 }
 
-.site-footer__label { 
-  font-weight: 600; 
-  font-size: 1.1rem;
-  color: var(--text-white); 
-}
-
-.site-footer__logo { 
-  height: 20px;
-  width: auto; 
-}
-
-.site-footer:hover { 
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.site-footer:active { 
-  background: rgba(0, 0, 0, 0.4); 
-}
-
-.site-footer:active .site-footer__label, 
-.site-footer:active .site-footer__logo { 
-  transform: scale(0.95); 
-}
-
-/* ==================================================
-   响应式设计
-================================================== */
 @media (max-width: 767px) {
-  body {
-    padding: var(--top-bar-height) 10px 0 10px;
-    font-size: 1rem;
-  }
-  
-  .site-footer {
-    margin: 20px 0 0 0;
-    padding: 10px 12px;
-    min-height: 45px;
-  }
-  
-  .site-footer__label {
-    font-size: 1rem;
-  }
-  
-  .site-footer__logo {
-    height: 18px;
-  }
-  
- 
+  body { padding-left: 10px; padding-right: 10px; font-size: 1rem; }
+  .site-footer { margin-top: 20px; padding: 10px 12px; }
+  .site-footer__label { font-size: 1rem; }
+  .site-footer__logo { height: 18px; }
+}
+
+/* 尊重「减少动态效果」系统设置 */
+@media (prefers-reduced-motion: reduce) {
+  .top-bar__slogan { animation: none; }
+  html { scroll-behavior: auto; }
+}
